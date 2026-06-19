@@ -3,6 +3,8 @@ from functools import lru_cache
 from app.adapters.llm import LLMAdapter, MockLLMAdapter
 from app.adapters.media import MediaAdapter, MockMediaAdapter
 from app.config import Settings, get_settings
+from app.repositories import CampaignRepository, InMemoryCampaignRepository
+from app.services import CampaignService
 
 
 @lru_cache
@@ -23,3 +25,17 @@ def get_media_adapter() -> MediaAdapter:
 
 def settings_dependency() -> Settings:
     return get_settings()
+
+
+@lru_cache
+def get_campaign_repository() -> CampaignRepository:
+    return InMemoryCampaignRepository()
+
+
+def get_campaign_service() -> CampaignService:
+    return CampaignService(
+        settings=get_settings(),
+        llm_adapter=get_llm_adapter(),
+        media_adapter=get_media_adapter(),
+        repository=get_campaign_repository(),
+    )

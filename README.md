@@ -29,7 +29,30 @@ pytest
 ruff check .
 ```
 
+## API overview
+
+- `GET /health` - service health and active adapter kinds.
+- `POST /api/v1/campaigns/proposals` - create a campaign proposal from a brief.
+- `GET /api/v1/campaigns` - list stored campaign proposals.
+- `GET /api/v1/campaigns/{campaign_id}` - fetch a campaign proposal.
+
+Example proposal request:
+
+```json
+{
+  "name": "June Launch",
+  "objective": "lead_generation",
+  "target_audience": "B2B SaaS operators in Japan",
+  "total_budget_jpy": 300000,
+  "channels": ["search", "social"],
+  "kpis": ["qualified_leads", "cost_per_lead"],
+  "tone": "confident and concise"
+}
+```
+
 ## Implemented milestones
 
 - Milestone 1: server foundation, environment settings, mock LLM/media adapter
   interfaces, health endpoint, and focused tests.
+- Milestone 2: campaign proposal workflow that combines mock LLM creative
+  generation, mock media planning, in-memory persistence, and campaign APIs.
