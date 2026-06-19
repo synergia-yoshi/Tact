@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.adapters.media import MediaPlanResponse
 
-
 CampaignStatus = Literal["proposed", "scheduled", "published"]
 
 
