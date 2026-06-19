@@ -121,7 +121,7 @@ class MockMediaAdapter(MediaAdapter):
 
     async def publish_campaign(self, request: MediaPublishRequest) -> MediaPublishResponse:
         fingerprint = hashlib.sha256(
-            f"{request.account_id}:{request.campaign_id}".encode("utf-8")
+            f"{request.account_id}:{request.campaign_id}".encode()
         ).hexdigest()[:12]
         return MediaPublishResponse(
             request_id=f"media_publish_mock_{uuid4().hex}",
