@@ -1,0 +1,36 @@
+{
+  "name": "tact-prototype",
+  "version": "1.0.0",
+  "description": "Netlify-ready prototype for Tact GTM and Cursor development narrative.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/synergia-yoshi/cursor.git"
+  },
+  "keywords": [
+    "tact",
+    "gtm",
+    "sales",
+    "netlify"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/synergia-yoshi/cursor/issues"
+  },
+  "homepage": "https://github.com/synergia-yoshi/cursor#readme",
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}
