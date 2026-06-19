@@ -1,1 +1,84 @@
-# cursor
+# Tact Cursor MVP v3
+
+FastAPI server for a Tact campaign workflow MVP. The repository did not include
+`Tact_Cursor開発指示書.md`, so this implementation proceeds with the following
+explicit assumptions:
+
+- MVP v3 is a server-side API for campaign planning, creative drafting,
+  mock media submission, and mock performance retrieval.
+- Media APIs and LLMs are implemented through mock adapters first.
+- Adapter request/response models are shaped so real API clients can replace
+  the mock implementations later without changing service code.
+- Secrets are loaded only from server-side environment variables or `.env`.
+  They are never committed and are not returned from public API responses.
+
+## Local setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e ".[dev]"
+cp .env.example .env
+python3 -m uvicorn app.main:app --reload
+```
+
+## Test
+
+```bash
+python3 -m pytest
+python3 -m ruff check .
+```
+
+## API overview
+
+- `GET /health` - service health and active adapter kinds.
+- `POST /api/v1/campaigns/proposals` - create a campaign proposal from a brief.
+- `GET /api/v1/campaigns` - list stored campaign proposals.
+- `GET /api/v1/campaigns/{campaign_id}` - fetch a campaign proposal.
+- `POST /api/v1/campaigns/{campaign_id}/publish` - submit a proposed campaign
+  to the mock media API.
+- `GET /api/v1/campaigns/{campaign_id}/performance` - fetch mock media
+  performance for a submitted campaign.
+
+Example proposal request:
+
+```json
+{
+  "name": "June Launch",
+  "objective": "lead_generation",
+  "target_audience": "B2B SaaS operators in Japan",
+  "total_budget_jpy": 300000,
+  "channels": ["search", "social"],
+  "kpis": ["qualified_leads", "cost_per_lead"],
+  "tone": "confident and concise"
+}
+```
+
+## Implemented milestones
+
+- Milestone 1: server foundation, environment settings, mock LLM/media adapter
+  interfaces, health endpoint, and focused tests.
+- Milestone 2: campaign proposal workflow that combines mock LLM creative
+  generation, mock media planning, in-memory persistence, and campaign APIs.
+- Milestone 3: mock publish and performance workflow using the same media
+  adapter boundary intended for real media API replacement.
+
+## Acceptance checklist
+
+- [x] Server-side `.env` loading is supported through `pydantic-settings`.
+- [x] `.env` is ignored and only `.env.example` is committed.
+- [x] Health and workflow API responses do not expose API keys or base URLs.
+- [x] LLM access is behind an adapter with chat-completions style
+  request/response models.
+- [x] Media access is behind an adapter with plan, publish, and performance
+  request/response models.
+- [x] Mock adapters are the default and only implemented adapters in this MVP.
+- [x] Campaign proposal, publish, and performance flows have API tests.
+- [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
+
+## Remaining assumptions
+
+The referenced `Tact_Cursor開発指示書.md` file was not present in the
+repository at implementation time. If the file is later added, compare its §7
+acceptance criteria against the assumptions above and adjust the API surface or
+milestone scope accordingly.
