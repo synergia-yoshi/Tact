@@ -89,7 +89,8 @@ def test_publish_campaign_and_fetch_performance() -> None:
 
     assert performance_response.status_code == 200
     performance = performance_response.json()
-    assert performance["external_campaign_id"] == published["publish_result"]["external_campaign_id"]
+    external_campaign_id = published["publish_result"]["external_campaign_id"]
+    assert performance["external_campaign_id"] == external_campaign_id
     assert performance["impressions"] > 0
     assert performance["clicks"] > 0
     assert performance["conversions"] > 0
