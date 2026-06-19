@@ -15,18 +15,18 @@ explicit assumptions:
 ## Local setup
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+python3 -m pip install -e ".[dev]"
 cp .env.example .env
-uvicorn app.main:app --reload
+python3 -m uvicorn app.main:app --reload
 ```
 
 ## Test
 
 ```bash
-pytest
-ruff check .
+python3 -m pytest
+python3 -m ruff check .
 ```
 
 ## API overview
@@ -62,3 +62,23 @@ Example proposal request:
   generation, mock media planning, in-memory persistence, and campaign APIs.
 - Milestone 3: mock publish and performance workflow using the same media
   adapter boundary intended for real media API replacement.
+
+## Acceptance checklist
+
+- [x] Server-side `.env` loading is supported through `pydantic-settings`.
+- [x] `.env` is ignored and only `.env.example` is committed.
+- [x] Health and workflow API responses do not expose API keys or base URLs.
+- [x] LLM access is behind an adapter with chat-completions style
+  request/response models.
+- [x] Media access is behind an adapter with plan, publish, and performance
+  request/response models.
+- [x] Mock adapters are the default and only implemented adapters in this MVP.
+- [x] Campaign proposal, publish, and performance flows have API tests.
+- [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
+
+## Remaining assumptions
+
+The referenced `Tact_Cursor開発指示書.md` file was not present in the
+repository at implementation time. If the file is later added, compare its §7
+acceptance criteria against the assumptions above and adjust the API surface or
+milestone scope accordingly.
