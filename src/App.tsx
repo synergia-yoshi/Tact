@@ -1,6 +1,10 @@
-import { roadmap, segments, signals, stats, workflow } from './content';
+import { useState } from 'react';
+import { accountPlays, roadmap, segments, signals, stats, workflow } from './content';
 
 function App() {
+  const [selectedAccountIndex, setSelectedAccountIndex] = useState(0);
+  const selectedAccount = accountPlays[selectedAccountIndex];
+
   return (
     <main>
       <header className="site-header" aria-label="Tact navigation">
@@ -102,6 +106,60 @@ function App() {
               </div>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="section-shell workspace-demo" aria-label="Interactive Tact workspace">
+        <div className="section-heading">
+          <p className="eyebrow">Interactive Prototype</p>
+          <h2>ターゲットを選ぶと、商談準備がその場で切り替わる。</h2>
+          <p>
+            営業担当が朝の準備で見る画面を想定し、AI が扱うべき仮説、問い、
+            次アクション、メール下書きを一画面にまとめています。
+          </p>
+        </div>
+        <div className="workspace-grid">
+          <div className="account-list" role="list" aria-label="Target accounts">
+            {accountPlays.map((account, index) => (
+              <button
+                className={index === selectedAccountIndex ? 'account-button selected' : 'account-button'}
+                key={account.company}
+                onClick={() => setSelectedAccountIndex(index)}
+                type="button"
+              >
+                <span>{account.segment}</span>
+                <strong>{account.company}</strong>
+                <small>Fit score {account.score}</small>
+              </button>
+            ))}
+          </div>
+          <article className="workspace-panel">
+            <div className="workspace-panel-header">
+              <div>
+                <span className="mini-label">Selected account</span>
+                <h3>{selectedAccount.company}</h3>
+              </div>
+              <strong>{selectedAccount.score}</strong>
+            </div>
+            <div className="insight-grid">
+              <div>
+                <span>仮説</span>
+                <p>{selectedAccount.hypothesis}</p>
+              </div>
+              <div>
+                <span>初回で聞く問い</span>
+                <p>{selectedAccount.question}</p>
+              </div>
+              <div>
+                <span>次の一手</span>
+                <p>{selectedAccount.nextAction}</p>
+              </div>
+            </div>
+            <div className="email-draft">
+              <span>AI email draft</span>
+              <p>{selectedAccount.email}</p>
+            </div>
+          </article>
         </div>
       </section>
 

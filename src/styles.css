@@ -344,6 +344,7 @@ h3 {
 }
 
 .workflow-section,
+.workspace-demo,
 .roadmap-section,
 .cta {
   padding: 84px 0;
@@ -372,6 +373,119 @@ h3 {
   font-size: 1.5rem;
   font-weight: 900;
   letter-spacing: -0.04em;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.62fr) minmax(0, 1.38fr);
+  gap: 16px;
+}
+
+.account-list {
+  display: grid;
+  gap: 12px;
+}
+
+.account-button {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid rgba(22, 37, 28, 0.12);
+  border-radius: 24px;
+  padding: 18px;
+  color: #17201a;
+  text-align: left;
+  background: rgba(255, 252, 245, 0.72);
+  box-shadow: 0 18px 46px rgba(42, 53, 45, 0.07);
+  cursor: pointer;
+}
+
+.account-button:hover,
+.account-button.selected {
+  border-color: rgba(47, 141, 103, 0.46);
+  background: #fffaf0;
+}
+
+.account-button span,
+.account-button small {
+  color: #6b756d;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.account-button strong {
+  font-size: 1.05rem;
+}
+
+.workspace-panel {
+  border: 1px solid rgba(22, 37, 28, 0.12);
+  border-radius: 34px;
+  padding: 28px;
+  background:
+    linear-gradient(145deg, rgba(255, 252, 245, 0.9), rgba(255, 252, 245, 0.72)),
+    radial-gradient(circle at 90% 8%, rgba(80, 220, 166, 0.2), transparent 18rem);
+  box-shadow: 0 30px 80px rgba(42, 53, 45, 0.1);
+}
+
+.workspace-panel-header {
+  display: flex;
+  gap: 18px;
+  align-items: start;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.workspace-panel-header h3 {
+  margin: 8px 0 0;
+  font-size: clamp(1.9rem, 4vw, 3.4rem);
+  letter-spacing: -0.055em;
+}
+
+.workspace-panel-header > strong {
+  display: inline-grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border-radius: 24px;
+  color: #f8f4ea;
+  background: #16251c;
+  font-size: 1.5rem;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.insight-grid div,
+.email-draft {
+  border: 1px solid rgba(22, 37, 28, 0.1);
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.insight-grid span,
+.email-draft span {
+  display: block;
+  margin-bottom: 8px;
+  color: #2f8d67;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.insight-grid p,
+.email-draft p {
+  margin-bottom: 0;
+  color: #58645c;
+  line-height: 1.75;
+}
+
+.email-draft {
+  margin-top: 12px;
 }
 
 .product-preview {
@@ -455,7 +569,8 @@ h3 {
 
   .hero,
   .split-section,
-  .product-preview {
+  .product-preview,
+  .workspace-grid {
     grid-template-columns: 1fr;
   }
 
@@ -468,7 +583,8 @@ h3 {
   }
 
   .stats,
-  .roadmap {
+  .roadmap,
+  .insight-grid {
     grid-template-columns: 1fr;
   }
 }
