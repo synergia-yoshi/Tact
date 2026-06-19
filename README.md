@@ -35,6 +35,10 @@ ruff check .
 - `POST /api/v1/campaigns/proposals` - create a campaign proposal from a brief.
 - `GET /api/v1/campaigns` - list stored campaign proposals.
 - `GET /api/v1/campaigns/{campaign_id}` - fetch a campaign proposal.
+- `POST /api/v1/campaigns/{campaign_id}/publish` - submit a proposed campaign
+  to the mock media API.
+- `GET /api/v1/campaigns/{campaign_id}/performance` - fetch mock media
+  performance for a submitted campaign.
 
 Example proposal request:
 
@@ -56,3 +60,5 @@ Example proposal request:
   interfaces, health endpoint, and focused tests.
 - Milestone 2: campaign proposal workflow that combines mock LLM creative
   generation, mock media planning, in-memory persistence, and campaign APIs.
+- Milestone 3: mock publish and performance workflow using the same media
+  adapter boundary intended for real media API replacement.

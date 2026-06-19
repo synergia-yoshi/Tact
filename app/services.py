@@ -3,13 +3,23 @@ from __future__ import annotations
 import json
 
 from app.adapters.llm import LLMAdapter, LLMChatRequest, LLMMessage
-from app.adapters.media import MediaAdapter, MediaPlanRequest
+from app.adapters.media import (
+    MediaAdapter,
+    MediaPerformanceRequest,
+    MediaPerformanceResponse,
+    MediaPlanRequest,
+    MediaPublishRequest,
+)
 from app.config import Settings
 from app.models.campaign import CampaignBrief, CampaignProposal, CreativeDraft
 from app.repositories import CampaignRepository
 
 
 class CampaignNotFoundError(LookupError):
+    pass
+
+
+class CampaignNotPublishedError(RuntimeError):
     pass
 
 
@@ -78,6 +88,39 @@ class CampaignService:
 
     def list_campaigns(self) -> list[CampaignProposal]:
         return self._repository.list()
+
+    async def publish_campaign(self, campaign_id: str) -> CampaignProposal:
+        campaign = self.get_campaign(campaign_id)
+        if campaign.publish_result is not None:
+            return campaign
+
+        publish_result = await self._media_adapter.publish_campaign(
+            MediaPublishRequest(
+                account_id=self._settings.mock_media_account_id,
+                campaign_id=campaign.id,
+                placements=campaign.media_plan.placements,
+                creative={
+                    "headline": campaign.creative.headline,
+                    "body": campaign.creative.body,
+                    "call_to_action": campaign.creative.call_to_action,
+                },
+            )
+        )
+        campaign.publish_result = publish_result
+        campaign.status = publish_result.status
+        return self._repository.save(campaign)
+
+    async def get_performance(self, campaign_id: str) -> MediaPerformanceResponse:
+        campaign = self.get_campaign(campaign_id)
+        if campaign.publish_result is None:
+            raise CampaignNotPublishedError(campaign_id)
+
+        return await self._media_adapter.get_performance(
+            MediaPerformanceRequest(
+                account_id=self._settings.mock_media_account_id,
+                external_campaign_id=campaign.publish_result.external_campaign_id,
+            )
+        )
 
     def _creative_from_llm(self, content: str, brief: CampaignBrief) -> CreativeDraft:
         data = json.loads(content)

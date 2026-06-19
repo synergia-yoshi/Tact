@@ -6,9 +6,9 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.adapters.media import MediaPlanResponse
+from app.adapters.media import MediaPlanResponse, MediaPublishResponse
 
-CampaignStatus = Literal["proposed", "scheduled", "published"]
+CampaignStatus = Literal["proposed", "draft", "scheduled", "published", "failed"]
 
 
 class CampaignBrief(BaseModel):
@@ -42,5 +42,6 @@ class CampaignProposal(BaseModel):
     brief: CampaignBrief
     creative: CreativeDraft
     media_plan: MediaPlanResponse
+    publish_result: MediaPublishResponse | None = None
     status: CampaignStatus = "proposed"
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
