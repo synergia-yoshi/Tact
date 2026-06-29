@@ -198,3 +198,49 @@ test("settings shows honest data integration status and admin-only connection pa
   await firstConnectButton.click();
   await expect(page.getByText("APIキーはこの画面では扱いません")).toBeVisible();
 });
+
+test("primary surfaces stay responsive across target widths", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#create-button").click();
+  await expect(page.locator("#creative-title")).toBeVisible();
+  await page.locator('[data-role="admin"]').click();
+  await expect(page.locator('[data-role="admin"]')).toHaveClass(/active/);
+
+  const routes = [
+    "home",
+    "campaigns",
+    "dashboard",
+    "tasks",
+    "creative",
+    "audit",
+    "roles",
+    "settings",
+  ];
+  const widths = [360, 390, 768, 1024, 1280, 1440];
+
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width < 700 ? 844 : 900 });
+    for (const route of routes) {
+      await page.locator(`[data-route="${route}"]`).first().click();
+      await page.waitForTimeout(40);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+          ),
+        )
+        .toBe(true);
+    }
+
+    const smallButtons = await page.locator("button:visible").evaluateAll((buttons) =>
+      buttons
+        .map((button) => {
+          const rect = button.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        })
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .filter((rect) => rect.width < 44 || rect.height < 44),
+    );
+    expect(smallButtons).toEqual([]);
+  }
+});

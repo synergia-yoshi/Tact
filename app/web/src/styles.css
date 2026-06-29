@@ -30,6 +30,8 @@
 html,
 body {
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 body {
@@ -49,6 +51,8 @@ input {
 
 button {
   cursor: pointer;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 button:disabled {
@@ -77,6 +81,28 @@ svg {
 .shell {
   display: flex;
   min-height: 100vh;
+  max-width: 100%;
+}
+
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  color: #5f3900;
+  background: #fff4d6;
+  border-bottom: 1px solid #efd28b;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.demo-mode .shell {
+  min-height: calc(100vh - 40px);
 }
 
 .sidebar {
@@ -213,6 +239,8 @@ svg {
   background: transparent;
   font-size: 13.5px;
   font-weight: 700;
+  min-height: 44px;
+  min-width: 44px;
   text-align: left;
 }
 
@@ -317,6 +345,8 @@ p {
 
 .role-switcher {
   display: inline-flex;
+  max-width: 100%;
+  flex-wrap: wrap;
   gap: 4px;
   border: 1px solid var(--bd);
   border-radius: 999px;
@@ -1791,7 +1821,7 @@ code {
   }
 
   .new-campaign {
-    width: 40px;
+    width: 44px;
     flex: none;
     gap: 0;
     margin-left: 0;
@@ -1805,15 +1835,27 @@ code {
 
   .nav-list {
     flex: 1;
-    justify-content: space-between;
+    justify-content: flex-start;
     min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .nav-item {
-    flex: 1 1 34px;
+    flex: 0 0 44px;
     justify-content: center;
     min-width: 0;
     padding: 9px 7px;
+  }
+
+  .topbar-actions,
+  .role-switcher {
+    width: 100%;
+  }
+
+  .role-button {
+    flex: 1 1 72px;
+    padding-inline: 8px;
   }
 
   .hero-panel {

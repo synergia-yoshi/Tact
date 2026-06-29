@@ -1,6 +1,6 @@
 import Chart from "chart.js/auto";
 import "./styles.css";
-import { api, setBearerToken } from "./api";
+import { api, isDemoMode, setBearerToken } from "./api";
 import { escapeHtml, safeAttr } from "./escape";
 import {
   activeCampaign,
@@ -904,7 +904,12 @@ function renderDashboard(): void {
   const state = getState();
   const content = el("dashboard-content");
   if (campaign == null) {
-    content.innerHTML = emptyState("成果はまだありません", "広告案を作成すると、予測や実データの数字をここで確認できます。");
+    content.innerHTML = emptyState(
+      "成果はまだありません",
+      isDemoMode
+        ? "広告案を作成すると、テスト用の数字をここで確認できます。"
+        : "広告案を作成すると、予測や実データの数字をここで確認できます。",
+    );
     destroyChart();
     return;
   }
@@ -1345,6 +1350,7 @@ function metricSourceLabel(metric: DashboardMetric): string {
 }
 
 function sourceText(source: string, dataKind: string | null): string {
+  if (isDemoMode) return "テスト用";
   if (source === "ga4_shopify") return "実データ";
   if (source === "media_plan_mock") return "テスト用";
   if (source === "ga4_shopify_mock" || source === "mock_media") return "テスト用";
@@ -1523,13 +1529,19 @@ function roleAssignmentRow(assignment: RoleAssignment): string {
 function renderSettings(): void {
   const state = getState();
   const canManageIntegrations = state.devTokenAvailable === true && state.role === "admin";
+  const integrationIntro = isDemoMode
+    ? "外部連携の見本画面です。数字はすべてテスト用として表示します。"
+    : "実データにつなぐ準備画面です。今はテスト用の数字として表示します。";
+  const salesAccessIntro = isDemoMode
+    ? "このデモではテスト用の数字だけを表示します。接続操作も実行されません。"
+    : "今はテスト用の数字で確認中です。実データ連携までは、画面上もテスト用と表示します。";
   el("settings-content").innerHTML = `
     <div class="settings-grid">
       <article class="setting-card settings-wide">
         <div class="setting-head">
           <div>
             <h3>データ連携</h3>
-            <p>実データにつなぐ準備画面です。今はテスト用の数字として表示します。</p>
+            <p>${escapeHtml(integrationIntro)}</p>
           </div>
           <span class="badge amber">APIキー入力なし</span>
         </div>
@@ -1545,7 +1557,7 @@ function renderSettings(): void {
       </article>
       <article class="setting-card">
         <h3>売上・アクセス連携</h3>
-        <p>今はテスト用の数字で確認中です。実データ連携までは、画面上もテスト用と表示します。</p>
+        <p>${escapeHtml(salesAccessIntro)}</p>
         <span class="badge amber">テスト用</span>
       </article>
       <article class="setting-card">
@@ -1623,6 +1635,7 @@ function allDataIntegrations(): DataIntegration[] {
 }
 
 async function bootstrap(): Promise<void> {
+  applyDemoModeChrome();
   setState({ dashboardFilters: loadStoredDashboardFilters() });
   renderNav();
   bindEvents();
@@ -1862,6 +1875,12 @@ async function approvePendingAction(actionId: string): Promise<void> {
   } catch (error) {
     setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
   }
+}
+
+function applyDemoModeChrome(): void {
+  document.body.classList.toggle("demo-mode", isDemoMode);
+  const banner = document.getElementById("demo-banner");
+  if (banner != null) banner.hidden = !isDemoMode;
 }
 
 async function loadDashboard(): Promise<void> {
@@ -2110,6 +2129,7 @@ function formatEstimate(
 }
 
 function sourceLabel(source: EstimateRange["source"]): string {
+  if (isDemoMode) return source === "model" ? "自動推定" : "テスト用の数字";
   if (source === "measured") return "実データ";
   if (source === "model") return "自動推定";
   return "テスト用の数字";
@@ -2132,6 +2152,7 @@ function pct(value: number): string {
 }
 
 function dataLabel(kind: string): string {
+  if (isDemoMode) return "テスト用";
   return kind === "measured" ? "実データ" : "テスト用";
 }
 
