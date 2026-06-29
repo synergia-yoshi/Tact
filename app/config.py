@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="Tact Cursor API", alias="APP_NAME")
     media_adapter: AdapterKind = Field(default="mock", alias="MEDIA_ADAPTER")
     llm_adapter: AdapterKind = Field(default="mock", alias="LLM_ADAPTER")
+    measurement_adapter: AdapterKind = Field(default="mock", alias="MEASUREMENT_ADAPTER")
     storage_backend: StorageBackend = Field(default="memory", alias="STORAGE_BACKEND")
     auth_mode: AuthMode = Field(default="disabled", alias="AUTH_MODE")
 
@@ -44,6 +45,7 @@ class Settings(BaseSettings):
             "environment": self.app_env,
             "media_adapter": self.media_adapter,
             "llm_adapter": self.llm_adapter,
+            "measurement_adapter": self.measurement_adapter,
             "storage_backend": self.storage_backend,
             "auth_mode": self.auth_mode,
         }

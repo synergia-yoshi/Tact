@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from app.adapters.llm import LLMAdapter, MockLLMAdapter
+from app.adapters.measurement import MeasurementAdapter, MockMeasurementAdapter
 from app.adapters.media import MediaAdapter, MockMediaAdapter
 from app.config import Settings, get_settings
 from app.firestore_repositories import (
@@ -39,6 +40,14 @@ def get_media_adapter() -> MediaAdapter:
     if settings.media_adapter == "mock":
         return MockMediaAdapter()
     raise NotImplementedError("Real media adapter is not implemented in MVP v3.")
+
+
+@lru_cache
+def get_measurement_adapter() -> MeasurementAdapter:
+    settings = get_settings()
+    if settings.measurement_adapter == "mock":
+        return MockMeasurementAdapter()
+    raise NotImplementedError("Real measurement adapter is not implemented in MVP v3.")
 
 
 def settings_dependency() -> Settings:
@@ -95,6 +104,7 @@ def get_campaign_service() -> CampaignService:
         settings=get_settings(),
         llm_adapter=get_llm_adapter(),
         media_adapter=get_media_adapter(),
+        measurement_adapter=get_measurement_adapter(),
         repository=get_campaign_repository(),
         audit_repository=get_audit_repository(),
     )

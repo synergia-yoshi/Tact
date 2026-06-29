@@ -7,9 +7,11 @@ from app.auth import AuthContext, get_auth_context
 from app.dependencies import get_campaign_service
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import CampaignBrief, CampaignProposal
+from app.models.measurement import MetricSnapshot
 from app.services import (
     AgentActionNotFoundError,
     AgentActionNotPendingError,
+    CampaignMeasurementRequiredError,
     CampaignNotFoundError,
     CampaignNotPublishedError,
     CampaignService,
@@ -75,6 +77,47 @@ async def publish_campaign(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Campaign not found",
         ) from error
+    except CampaignMeasurementRequiredError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Measurement snapshot required before publish approval can be requested",
+        ) from error
+
+
+@router.post("/{campaign_id}/measurements/refresh", response_model=MetricSnapshot)
+async def refresh_campaign_measurements(
+    campaign_id: str,
+    service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+) -> MetricSnapshot:
+    try:
+        return await service.refresh_measurements(campaign_id, auth_context)
+    except CampaignNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        ) from error
+
+
+@router.get("/{campaign_id}/measurements/latest", response_model=MetricSnapshot)
+async def get_latest_campaign_measurement(
+    campaign_id: str,
+    service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+) -> MetricSnapshot:
+    try:
+        snapshot = service.latest_measurement(campaign_id, auth_context)
+    except CampaignNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        ) from error
+    if snapshot is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Measurement snapshot not found",
+        )
+    return snapshot
 
 
 @router.post("/{campaign_id}/actions/{action_id}/approve", response_model=CampaignProposal)

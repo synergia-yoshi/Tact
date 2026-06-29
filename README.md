@@ -36,7 +36,12 @@ python3 -m ruff check .
 - `GET /api/v1/campaigns` - list stored campaign proposals.
 - `GET /api/v1/campaigns/{campaign_id}` - fetch a campaign proposal.
 - `POST /api/v1/campaigns/{campaign_id}/publish` - create a server-side
-  `pending_approval` publish action; no media mutation happens yet.
+  `pending_approval` publish action after a measurement snapshot exists; no
+  media mutation happens yet.
+- `POST /api/v1/campaigns/{campaign_id}/measurements/refresh` - fetch a
+  read-only GA4/Shopify-shaped measurement snapshot.
+- `GET /api/v1/campaigns/{campaign_id}/measurements/latest` - return the latest
+  measurement snapshot for the campaign.
 - `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/approve` - approve
   and submit a pending publish action to the mock media API.
 - `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/reject` - reject a
@@ -74,6 +79,8 @@ Example proposal request:
   verification and human approval gating before publish mutation.
 - Milestone 5: storage backend switch for Firestore plus Secret Manager
   reference resolution boundaries.
+- Milestone 6: measurement-first read model that requires a GA4/Shopify-shaped
+  snapshot before publish approval can be requested.
 
 ## Persistence and secrets
 
@@ -146,6 +153,8 @@ tenant headers such as `x-tact-org`.
   are not required for local tests.
 - [x] Campaign and audit access are scoped by verified auth context rather than
   client-supplied tenant headers.
+- [x] Publish approval requests require a read-only measurement snapshot first.
+- [x] Metric snapshots label values as simulated/measured and carry confidence.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions
