@@ -9,6 +9,14 @@ export type RouteName =
   | "settings";
 export type AutonomyLevel = "full_auto" | "approval_only" | "guided";
 export type DataKind = "measured" | "simulated";
+export type EstimateSource = "mock" | "model" | "measured";
+
+export interface EstimateRange {
+  low: number;
+  high: number;
+  confidence: number | null;
+  source: EstimateSource;
+}
 
 export interface CampaignBrief {
   name: string;
@@ -22,6 +30,7 @@ export interface CampaignBrief {
 }
 
 export interface CreativeDraft {
+  source: "mock" | "model";
   headline: string;
   body: string;
   call_to_action: string;
@@ -40,9 +49,12 @@ export interface MediaPlacement {
 export interface MediaPlan {
   request_id: string;
   account_id: string;
+  source: "mock" | "model";
   placements: MediaPlacement[];
   estimated_reach: number;
+  estimated_reach_range: EstimateRange | null;
   estimated_cpa_jpy: number;
+  estimated_cpa_jpy_range: EstimateRange | null;
   generated_at: string;
 }
 
@@ -66,7 +78,10 @@ export interface MetricSnapshot {
   revenue_jpy: number;
   ad_spend_jpy: number;
   cpa_jpy: number;
+  cpa_jpy_range: EstimateRange | null;
   roas: number;
+  roas_range: EstimateRange | null;
+  conversions_range: EstimateRange | null;
   confidence: number;
   labels: Record<string, DataKind>;
   measured_at: string;
@@ -111,6 +126,13 @@ export interface AuditEntry {
   hash: string;
   prev_hash: string | null;
   created_at: string;
+}
+
+export interface AuditVerificationResult {
+  valid: boolean;
+  entries_checked: number;
+  broken_entry_id: string | null;
+  reason: string | null;
 }
 
 export interface DevTokenResponse {

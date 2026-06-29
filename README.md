@@ -1,4 +1,4 @@
-# Tact Cursor MVP v3
+# Tact MVP v3
 
 FastAPI server for a Tact campaign workflow MVP. The repository did not include
 `Tact_Cursor開発指示書.md`, so this implementation proceeds with the following

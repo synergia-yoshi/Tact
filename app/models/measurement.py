@@ -6,6 +6,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from app.models.estimation import EstimateRange
+
 MetricDataKind = Literal["measured", "simulated"]
 
 
@@ -19,7 +21,10 @@ class MetricSnapshot(BaseModel):
     revenue_jpy: int = Field(ge=0)
     ad_spend_jpy: int = Field(ge=0)
     cpa_jpy: float = Field(ge=0)
+    cpa_jpy_range: EstimateRange | None = None
     roas: float = Field(ge=0)
+    roas_range: EstimateRange | None = None
+    conversions_range: EstimateRange | None = None
     confidence: float = Field(ge=0, le=1)
     labels: dict[str, MetricDataKind]
     measured_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
