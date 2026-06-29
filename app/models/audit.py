@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 class AuditEntry(BaseModel):
     id: str = Field(default_factory=lambda: f"aud_{uuid4().hex}")
     event_type: str
+    org_id: str = "dev-org"
     actor: str
     subject_type: str
     subject_id: str
@@ -28,6 +29,7 @@ class AuditEntry(BaseModel):
         cls,
         *,
         event_type: str,
+        org_id: str,
         actor: str,
         subject_type: str,
         subject_id: str,
@@ -39,6 +41,7 @@ class AuditEntry(BaseModel):
     ) -> AuditEntry:
         entry = cls(
             event_type=event_type,
+            org_id=org_id,
             actor=actor,
             subject_type=subject_type,
             subject_id=subject_id,

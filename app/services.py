@@ -10,6 +10,7 @@ from app.adapters.media import (
     MediaPlanRequest,
     MediaPublishRequest,
 )
+from app.auth import AuthContext
 from app.config import Settings
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import AgentAction, CampaignBrief, CampaignProposal, CreativeDraft
@@ -48,7 +49,12 @@ class CampaignService:
         self._repository = repository
         self._audit_repository = audit_repository
 
-    async def create_proposal(self, brief: CampaignBrief) -> CampaignProposal:
+    async def create_proposal(
+        self,
+        brief: CampaignBrief,
+        auth_context: AuthContext | None = None,
+    ) -> CampaignProposal:
+        auth_context = auth_context or AuthContext.dev()
         llm_response = await self._llm_adapter.create_chat_completion(
             LLMChatRequest(
                 model=self._settings.mock_llm_model,
@@ -88,11 +94,18 @@ class CampaignService:
         )
 
         proposal = self._repository.save(
-            CampaignProposal(brief=brief, creative=creative, media_plan=media_plan)
+            CampaignProposal(
+                org_id=auth_context.org_id,
+                created_by=auth_context.actor_id,
+                brief=brief,
+                creative=creative,
+                media_plan=media_plan,
+            )
         )
         self._audit_repository.append(
             event_type="campaign.proposal.created",
-            actor="system",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=proposal.id,
             summary="Campaign proposal created from server-side LLM and media planning.",
@@ -118,17 +131,28 @@ class CampaignService:
         )
         return proposal
 
-    def get_campaign(self, campaign_id: str) -> CampaignProposal:
-        campaign = self._repository.get(campaign_id)
+    def get_campaign(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> CampaignProposal:
+        auth_context = auth_context or AuthContext.dev()
+        campaign = self._repository.get(campaign_id, org_id=auth_context.org_id)
         if campaign is None:
             raise CampaignNotFoundError(campaign_id)
         return campaign
 
-    def list_campaigns(self) -> list[CampaignProposal]:
-        return self._repository.list()
+    def list_campaigns(self, auth_context: AuthContext | None = None) -> list[CampaignProposal]:
+        auth_context = auth_context or AuthContext.dev()
+        return self._repository.list(org_id=auth_context.org_id)
 
-    async def publish_campaign(self, campaign_id: str) -> CampaignProposal:
-        campaign = self.get_campaign(campaign_id)
+    async def publish_campaign(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> CampaignProposal:
+        auth_context = auth_context or AuthContext.dev()
+        campaign = self.get_campaign(campaign_id, auth_context)
         if campaign.publish_result is not None:
             return campaign
         if self._find_pending_publish_action(campaign) is not None:
@@ -157,7 +181,8 @@ class CampaignService:
         saved = self._repository.save(campaign)
         self._audit_repository.append(
             event_type="campaign.publish.requested",
-            actor="system",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
             summary="Publish action created as pending approval; no media mutation executed.",
@@ -167,8 +192,14 @@ class CampaignService:
         )
         return saved
 
-    async def approve_action(self, campaign_id: str, action_id: str) -> CampaignProposal:
-        campaign = self.get_campaign(campaign_id)
+    async def approve_action(
+        self,
+        campaign_id: str,
+        action_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> CampaignProposal:
+        auth_context = auth_context or AuthContext.dev()
+        campaign = self.get_campaign(campaign_id, auth_context)
         action = self._get_action(campaign, action_id)
         if action.approval_status != "pending_approval":
             raise AgentActionNotPendingError(action_id)
@@ -193,7 +224,8 @@ class CampaignService:
         saved = self._repository.save(campaign)
         self._audit_repository.append(
             event_type="campaign.publish.approved",
-            actor="human",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
             summary="Pending publish action approved and submitted through the media adapter.",
@@ -209,8 +241,14 @@ class CampaignService:
         )
         return saved
 
-    def reject_action(self, campaign_id: str, action_id: str) -> CampaignProposal:
-        campaign = self.get_campaign(campaign_id)
+    def reject_action(
+        self,
+        campaign_id: str,
+        action_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> CampaignProposal:
+        auth_context = auth_context or AuthContext.dev()
+        campaign = self.get_campaign(campaign_id, auth_context)
         action = self._get_action(campaign, action_id)
         if action.approval_status != "pending_approval":
             raise AgentActionNotPendingError(action_id)
@@ -220,7 +258,8 @@ class CampaignService:
         saved = self._repository.save(campaign)
         self._audit_repository.append(
             event_type="campaign.publish.rejected",
-            actor="human",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
             summary="Pending publish action rejected; no media mutation executed.",
@@ -230,8 +269,12 @@ class CampaignService:
         )
         return saved
 
-    async def get_performance(self, campaign_id: str) -> MediaPerformanceResponse:
-        campaign = self.get_campaign(campaign_id)
+    async def get_performance(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> MediaPerformanceResponse:
+        campaign = self.get_campaign(campaign_id, auth_context)
         if campaign.publish_result is None:
             raise CampaignNotPublishedError(campaign_id)
 
@@ -242,9 +285,18 @@ class CampaignService:
             )
         )
 
-    def list_campaign_audit(self, campaign_id: str) -> list[AuditEntry]:
-        self.get_campaign(campaign_id)
-        return self._audit_repository.list_for_subject("campaign", campaign_id)
+    def list_campaign_audit(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> list[AuditEntry]:
+        auth_context = auth_context or AuthContext.dev()
+        self.get_campaign(campaign_id, auth_context)
+        return self._audit_repository.list_for_subject(
+            "campaign",
+            campaign_id,
+            org_id=auth_context.org_id,
+        )
 
     def verify_audit(self) -> AuditVerificationResult:
         return self._audit_repository.verify()

@@ -107,6 +107,26 @@ MEDIA_API_KEY=sm://projects/<project-id>/secrets/<secret-name>/versions/latest
 The health endpoint exposes only adapter/storage kinds, never raw secret values
 or secret reference names.
 
+## Auth and tenant boundary
+
+Local development defaults to:
+
+```txt
+AUTH_MODE=disabled
+```
+
+In that mode the API uses a fixed `dev-org` / `dev-user` context. Server
+deployments should require signed bearer auth:
+
+```txt
+AUTH_MODE=signed_bearer
+AUTH_TOKEN_SECRET=sm://projects/<project-id>/secrets/tact-auth-token-secret/versions/latest
+```
+
+Signed bearer tokens carry verified `sub`, `org_id`, and `roles` claims. The
+service derives tenant scope from the verified token and ignores spoofable
+tenant headers such as `x-tact-org`.
+
 ## Acceptance checklist
 
 - [x] Server-side `.env` loading is supported through `pydantic-settings`.
@@ -124,6 +144,8 @@ or secret reference names.
   hash chain.
 - [x] Firestore and Secret Manager are behind server-side adapter boundaries and
   are not required for local tests.
+- [x] Campaign and audit access are scoped by verified auth context rather than
+  client-supplied tenant headers.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions
