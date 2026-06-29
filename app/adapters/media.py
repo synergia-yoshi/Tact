@@ -66,6 +66,19 @@ class MediaPerformanceResponse(BaseModel):
     measured_at: datetime
 
 
+class MediaDeliveryStatusRequest(BaseModel):
+    account_id: str
+    external_campaign_id: str
+
+
+class MediaDeliveryStatusResponse(BaseModel):
+    external_campaign_id: str
+    active: bool
+    health: Literal["healthy", "degraded", "stopped", "unknown"]
+    data_kind: Literal["measured", "simulated"]
+    checked_at: datetime
+
+
 class MediaAdapter(ABC):
     @abstractmethod
     async def create_plan(self, request: MediaPlanRequest) -> MediaPlanResponse:
@@ -80,6 +93,12 @@ class MediaAdapter(ABC):
         self, request: MediaPerformanceRequest
     ) -> MediaPerformanceResponse:
         """Fetch campaign performance using the same boundary shape as a real media API."""
+
+    @abstractmethod
+    async def get_delivery_status(
+        self, request: MediaDeliveryStatusRequest
+    ) -> MediaDeliveryStatusResponse:
+        """Fetch delivery status for kill-switch evaluation."""
 
 
 class MockMediaAdapter(MediaAdapter):
@@ -146,4 +165,15 @@ class MockMediaAdapter(MediaAdapter):
             conversions=conversions,
             spend_jpy=spend,
             measured_at=datetime.now(tz=UTC),
+        )
+
+    async def get_delivery_status(
+        self, request: MediaDeliveryStatusRequest
+    ) -> MediaDeliveryStatusResponse:
+        return MediaDeliveryStatusResponse(
+            external_campaign_id=request.external_campaign_id,
+            active=True,
+            health="healthy",
+            data_kind="simulated",
+            checked_at=datetime.now(tz=UTC),
         )
