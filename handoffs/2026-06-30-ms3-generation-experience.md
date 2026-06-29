@@ -64,6 +64,10 @@ do not make the UI look more real than the backend state supports.
   - Settings has honest `データ連携` rows for GA4 / Shopify / Google広告, all
     labeled `テスト用` in local/mock mode, with admin-only connection buttons
     and no API-key input.
+  - The Settings data-integration catalog is expanded with `準備中` rows across
+    計測・解析 / ネットショップ・決済 / 広告媒体 / 顧客・連絡. The final catalog has
+    18 rows: 3 `テスト用` rows and 15 `準備中` rows. Coming-soon rows do not
+    expose connection buttons.
 - Updated E2E and API tests for source labels and stepper behavior.
 - Rebuilt `app/web/dist`.
 
@@ -90,6 +94,9 @@ Working:
   budget and media-placement sum match.
 - Settings shows GA4 / Shopify / Google広告 as `テスト用`, disables connection
   buttons outside admin, and does not display `接続済み` for mock/test rows.
+- Settings also lists Search Console, Metaピクセル, BASE, STORES, 楽天市場,
+  Amazon, Stripe, Yahoo!広告, Meta広告, X広告, TikTok広告, LINE広告,
+  Microsoft広告, LINE公式アカウント, and Mailchimp as `準備中`.
 
 Still mock/simulated:
 
@@ -107,6 +114,8 @@ Still mock/simulated:
 - `npm run test:e2e` passed.
   - Includes MS3.5 checks for `¥5,000,000` budget submission/media allocation,
     two-choice automation UI, old copy removal, and data-integration status.
+  - Expanded catalog checks 18 integration rows, 15 `準備中` statuses, 3
+    connection buttons, and no visible `接続済み` for mock/test rows.
 - `npm run build` passed as part of E2E and refreshed `app/web/dist`.
 - `.\.venv312\Scripts\python.exe -m pytest` passed: 38 tests.
 - `.\.venv312\Scripts\python.exe -m ruff check .` passed.
@@ -120,6 +129,9 @@ Still mock/simulated:
 - MS3.5 browser smoke passed on `http://127.0.0.1:8012/`: home budget attrs,
   two-choice automation UI, old copy absence, settings test statuses,
   admin-only connection path, and 390x844 mobile no-horizontal-overflow check.
+- MS3.5 catalog smoke passed via local Playwright: desktop has 4 groups / 18
+  rows / `test=3` / `coming_soon=15` / 3 connect buttons / no visible
+  `接続済み`; mobile 390x844 has no horizontal overflow.
 - Visual SSoT smoke passed:
   - `rg` found no `--grad`, `#5b4ff0`, `#6d5cf5`, `rgba(76, 72, 210, ...)`, or
     `rgba(109, 92, 245, ...)` in `app/web/src/styles.css` or `app/web/dist`.
@@ -185,4 +197,6 @@ warning only.
 - [x] Existing unit/E2E/API tests cover the main path.
 - [x] MS3.5 budget upper bound, objective label, two-choice automation UI, and
   Settings data-integration rows are implemented.
+- [x] MS3.5 §4-補 expanded integration catalog is implemented with honest
+  `準備中` statuses and no false connection path.
 - [x] §5 copy/voice proposal was left unimplemented pending approval.

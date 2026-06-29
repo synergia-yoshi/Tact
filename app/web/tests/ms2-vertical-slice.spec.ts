@@ -119,10 +119,36 @@ test("settings shows honest data integration status and admin-only connection pa
 
   await page.getByRole("button", { name: "設定" }).click();
   await expect(page.getByRole("heading", { name: "データ連携" })).toBeVisible();
-  await expect(page.getByText("Googleアナリティクス（GA4）")).toBeVisible();
-  await expect(page.getByText("Shopify")).toBeVisible();
-  await expect(page.getByText("Google広告")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "計測・解析" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ネットショップ・決済" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "広告媒体" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "顧客・連絡" })).toBeVisible();
+  const integrationNames = [
+    "Googleアナリティクス（GA4）",
+    "Google Search Console",
+    "Metaピクセル",
+    "Shopify",
+    "BASE",
+    "STORES",
+    "楽天市場",
+    "Amazon",
+    "Stripe",
+    "Google広告",
+    "Yahoo!広告",
+    "Meta広告（Facebook/Instagram）",
+    "X広告",
+    "TikTok広告",
+    "LINE広告",
+    "Microsoft広告",
+    "LINE公式アカウント",
+    "Mailchimp",
+  ];
+  for (const name of integrationNames) {
+    await expect(page.locator(".integration-meta strong").getByText(name, { exact: true })).toBeVisible();
+  }
   await expect(page.locator('[data-integration-status="test"]')).toHaveCount(3);
+  await expect(page.locator('[data-integration-status="coming_soon"]')).toHaveCount(15);
+  await expect(page.locator("[data-integration-connect]")).toHaveCount(3);
   await expect(page.getByText("接続済み")).toHaveCount(0);
   await expect(page.locator("[data-integration-connect]").first()).toBeDisabled();
 

@@ -78,6 +78,11 @@ responses or explicit in-flight API phases.
   - Settings now includes a `データ連携` section for GA4, Shopify, and Google広告.
     Current dev/mock rows are labeled `テスト用`, connection buttons are
     admin-only, and no API key input/storage/display was added.
+  - The data-integration catalog now includes `準備中` entries for major
+    measurement, EC/payment, ad, and customer-contact services. The catalog is
+    grouped into 計測・解析 / ネットショップ・決済 / 広告媒体 / 顧客・連絡 with
+    18 total rows: 3 `テスト用` rows and 15 `準備中` rows. Coming-soon rows do
+    not expose connection buttons.
 - Rebuilt committed FastAPI-served assets in `app/web/dist`.
 - Existing MS2.5 behavior remains:
   loading/disabled/double-submit guards, partial rendering, stable Chart.js,
@@ -113,6 +118,10 @@ responses or explicit in-flight API phases.
   - Settings shows GA4 / Shopify / Google広告 as `テスト用`; non-admin connection
     buttons are disabled, admin sees the connection path, and the UI does not
     display `接続済み` for mock/test integrations.
+  - Settings also shows the expanded coming-soon catalog without implying
+    availability: Search Console, Metaピクセル, BASE, STORES, 楽天市場, Amazon,
+    Stripe, Yahoo!広告, Meta広告, X広告, TikTok広告, LINE広告, Microsoft広告,
+    LINE公式アカウント, and Mailchimp are visible as `準備中`.
 - Still mock/simulated:
   - GA4/Shopify read model is the existing mock adapter.
   - The new Settings data-integration rows are status/UX only; real OAuth and
@@ -141,6 +150,8 @@ responses or explicit in-flight API phases.
   - proposal submit is disabled while the request is in flight
   - MS3.5 budget upper bound, two automation choices, old copy removal, and
     settings data-integration state are covered
+  - Expanded data-integration catalog coverage checks 18 rows, 15 `準備中`
+    statuses, 3 connection buttons, and no visible `接続済み` for mock/test rows
 - `npm run build` passed as part of `npm run test:e2e` and refreshed
   `app/web/dist`.
 - `.\.venv312\Scripts\python.exe -m pytest` passed: 38 tests.
@@ -157,6 +168,10 @@ responses or explicit in-flight API phases.
   is absent, settings integration rows are `テスト用`, admin-only connection path
   shows a server-side OAuth/API-key warning, and a 390x844 mobile viewport has
   no horizontal overflow on the changed home/settings areas.
+- MS3.5 catalog smoke passed via local Playwright against
+  `http://127.0.0.1:8012/`: desktop has 4 groups / 18 rows / `test=3` /
+  `coming_soon=15` / 3 connect buttons / no visible `接続済み`; mobile 390x844
+  has no horizontal overflow.
 - Visual SSoT smoke passed:
   - `rg` found no `--grad`, `#5b4ff0`, `#6d5cf5`, `rgba(76, 72, 210, ...)`, or
     `rgba(109, 92, 245, ...)` in `app/web/src/styles.css` or `app/web/dist`.

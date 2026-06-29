@@ -38,7 +38,7 @@ let chartSignature: string | null = null;
 let lastFocusedBeforeModal: HTMLElement | null = null;
 const viewSignatures = new Map<string, string>();
 
-type DataIntegrationStatus = "unconnected" | "connected" | "test" | "error";
+type DataIntegrationStatus = "unconnected" | "connected" | "test" | "error" | "coming_soon";
 
 interface DataIntegration {
   key: string;
@@ -47,24 +47,139 @@ interface DataIntegration {
   status: DataIntegrationStatus;
 }
 
-const dataIntegrations: DataIntegration[] = [
+interface DataIntegrationGroup {
+  title: string;
+  integrations: DataIntegration[];
+}
+
+const dataIntegrationGroups: DataIntegrationGroup[] = [
   {
-    key: "ga4",
-    name: "Googleアナリティクス（GA4）",
-    purpose: "広告後の訪問数と成果を確認します。",
-    status: "test",
+    title: "計測・解析",
+    integrations: [
+      {
+        key: "ga4",
+        name: "Googleアナリティクス（GA4）",
+        purpose: "広告後の訪問数と成果を確認します。",
+        status: "test",
+      },
+      {
+        key: "search_console",
+        name: "Google Search Console",
+        purpose: "検索からの流入や表示回数を確認します。",
+        status: "coming_soon",
+      },
+      {
+        key: "meta_pixel",
+        name: "Metaピクセル",
+        purpose: "Facebook・Instagram経由の成果を確認します。",
+        status: "coming_soon",
+      },
+    ],
   },
   {
-    key: "shopify",
-    name: "Shopify",
-    purpose: "注文数と売上を確認します。",
-    status: "test",
+    title: "ネットショップ・決済",
+    integrations: [
+      {
+        key: "shopify",
+        name: "Shopify",
+        purpose: "注文数と売上を確認します。",
+        status: "test",
+      },
+      {
+        key: "base",
+        name: "BASE",
+        purpose: "ショップの注文と売上を確認します。",
+        status: "coming_soon",
+      },
+      {
+        key: "stores",
+        name: "STORES",
+        purpose: "ショップの注文と売上を確認します。",
+        status: "coming_soon",
+      },
+      {
+        key: "rakuten",
+        name: "楽天市場",
+        purpose: "モール内の売上と広告成果を確認します。",
+        status: "coming_soon",
+      },
+      {
+        key: "amazon",
+        name: "Amazon",
+        purpose: "Amazon内の売上と広告成果を確認します。",
+        status: "coming_soon",
+      },
+      {
+        key: "stripe",
+        name: "Stripe",
+        purpose: "決済と売上の数字を確認します。",
+        status: "coming_soon",
+      },
+    ],
   },
   {
-    key: "google_ads",
-    name: "Google広告",
-    purpose: "広告アカウントへの送信先を管理します。",
-    status: "test",
+    title: "広告媒体",
+    integrations: [
+      {
+        key: "google_ads",
+        name: "Google広告",
+        purpose: "広告アカウントへの送信先を管理します。",
+        status: "test",
+      },
+      {
+        key: "yahoo_ads",
+        name: "Yahoo!広告",
+        purpose: "Yahoo!広告の配信先を管理します。",
+        status: "coming_soon",
+      },
+      {
+        key: "meta_ads",
+        name: "Meta広告（Facebook/Instagram）",
+        purpose: "Facebook・Instagram広告の配信先を管理します。",
+        status: "coming_soon",
+      },
+      {
+        key: "x_ads",
+        name: "X広告",
+        purpose: "X広告の配信先を管理します。",
+        status: "coming_soon",
+      },
+      {
+        key: "tiktok_ads",
+        name: "TikTok広告",
+        purpose: "TikTok広告の配信先を管理します。",
+        status: "coming_soon",
+      },
+      {
+        key: "line_ads",
+        name: "LINE広告",
+        purpose: "LINE広告の配信先を管理します。",
+        status: "coming_soon",
+      },
+      {
+        key: "microsoft_ads",
+        name: "Microsoft広告",
+        purpose: "Microsoft広告の配信先を管理します。",
+        status: "coming_soon",
+      },
+    ],
+  },
+  {
+    title: "顧客・連絡",
+    integrations: [
+      {
+        key: "line_official",
+        name: "LINE公式アカウント",
+        purpose: "友だち追加やメッセージ配信を確認します。",
+        status: "coming_soon",
+      },
+      {
+        key: "mailchimp",
+        name: "Mailchimp",
+        purpose: "メール配信と反応を確認します。",
+        status: "coming_soon",
+      },
+    ],
   },
 ];
 
@@ -879,24 +994,42 @@ function renderSettings(): void {
 }
 
 function dataIntegrationRows(canManageIntegrations: boolean): string {
-  return dataIntegrations
-    .map((integration) => {
-      const disabled = canManageIntegrations ? "" : " disabled";
-      const title = canManageIntegrations
-        ? "接続手順を確認"
-        : "管理者だけが接続できます";
-      return `
-        <div class="integration-row">
-          <div class="integration-meta">
-            <strong>${escapeHtml(integration.name)}</strong>
-            <span>${escapeHtml(integration.purpose)}</span>
-          </div>
-          <span class="badge ${integrationBadgeClass(integration.status)}" data-integration-status="${safeAttr(integration.status)}">${escapeHtml(integrationStatusLabel(integration.status))}</span>
-          <button class="btn ghost integration-action" type="button" data-integration-connect="${safeAttr(integration.key)}" aria-label="${safeAttr(`${integration.name}を${integrationActionLabel(integration.status)}`)}" title="${safeAttr(title)}"${disabled}>${escapeHtml(integrationActionLabel(integration.status))}</button>
-        </div>
-      `;
-    })
+  return dataIntegrationGroups
+    .map(
+      (group) => `
+        <section class="integration-group" aria-label="${safeAttr(group.title)}">
+          <h4>${escapeHtml(group.title)}</h4>
+          ${group.integrations
+            .map(
+              (integration) => `
+                <div class="integration-row">
+                  <div class="integration-meta">
+                    <strong>${escapeHtml(integration.name)}</strong>
+                    <span>${escapeHtml(integration.purpose)}</span>
+                  </div>
+                  <span class="badge ${integrationBadgeClass(integration.status)}" data-integration-status="${safeAttr(integration.status)}">${escapeHtml(integrationStatusLabel(integration.status))}</span>
+                  ${integrationAction(integration, canManageIntegrations)}
+                </div>
+              `,
+            )
+            .join("")}
+        </section>
+      `,
+    )
     .join("");
+}
+
+function integrationAction(integration: DataIntegration, canManageIntegrations: boolean): string {
+  if (integration.status === "coming_soon") {
+    return `<span class="integration-action integration-action-static" aria-disabled="true">準備中</span>`;
+  }
+  const disabled = canManageIntegrations ? "" : " disabled";
+  const title = canManageIntegrations
+    ? "接続手順を確認"
+    : "管理者だけが接続できます";
+      return `
+        <button class="btn ghost integration-action" type="button" data-integration-connect="${safeAttr(integration.key)}" aria-label="${safeAttr(`${integration.name}を${integrationActionLabel(integration.status)}`)}" title="${safeAttr(title)}"${disabled}>${escapeHtml(integrationActionLabel(integration.status))}</button>
+      `;
 }
 
 function integrationStatusLabel(status: DataIntegrationStatus): string {
@@ -905,6 +1038,7 @@ function integrationStatusLabel(status: DataIntegrationStatus): string {
     connected: "接続済み",
     test: "テスト用",
     error: "エラー",
+    coming_soon: "準備中",
   };
   return labels[status];
 }
@@ -912,11 +1046,16 @@ function integrationStatusLabel(status: DataIntegrationStatus): string {
 function integrationBadgeClass(status: DataIntegrationStatus): string {
   if (status === "test") return "amber";
   if (status === "error") return "red";
+  if (status === "coming_soon" || status === "unconnected") return "muted";
   return "";
 }
 
 function integrationActionLabel(status: DataIntegrationStatus): string {
   return status === "connected" || status === "error" ? "再接続" : "接続する";
+}
+
+function allDataIntegrations(): DataIntegration[] {
+  return dataIntegrationGroups.flatMap((group) => group.integrations);
 }
 
 async function bootstrap(): Promise<void> {
@@ -1024,7 +1163,7 @@ function selectByDataset(selector: string, key: string, value: string, fallbackV
 }
 
 function showIntegrationNotice(integrationKey: string): void {
-  const integration = dataIntegrations.find((item) => item.key === integrationKey);
+  const integration = allDataIntegrations().find((item) => item.key === integrationKey);
   if (integration == null) return;
   setState({
     error: {

@@ -379,6 +379,12 @@ p {
   border: 1px solid #f1d7ad;
 }
 
+.badge.muted {
+  color: var(--tx2);
+  background: var(--surface2);
+  border: 1px solid var(--bd);
+}
+
 .badge.red {
   color: var(--rd);
   background: var(--rd-pale);
@@ -919,8 +925,20 @@ input[type="range"] {
 
 .integration-list {
   display: grid;
-  gap: 10px;
+  gap: 16px;
   margin-top: 16px;
+}
+
+.integration-group {
+  display: grid;
+  gap: 10px;
+}
+
+.integration-group h4 {
+  margin: 0;
+  color: var(--tx3);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .integration-row {
@@ -932,9 +950,8 @@ input[type="range"] {
   padding-top: 12px;
 }
 
-.integration-row:first-child {
-  border-top: 0;
-  padding-top: 0;
+.integration-group h4 + .integration-row {
+  border-top: 1px solid var(--bd);
 }
 
 .integration-meta {
@@ -958,6 +975,17 @@ input[type="range"] {
   min-width: 92px;
   padding: 8px 11px;
   font-size: 12px;
+}
+
+.integration-action-static {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  color: var(--tx2);
+  background: var(--surface2);
+  font-weight: 900;
 }
 
 .card-action {
