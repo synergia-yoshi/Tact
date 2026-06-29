@@ -11,8 +11,9 @@ from app.adapters.media import (
     MediaPublishRequest,
 )
 from app.config import Settings
-from app.models.campaign import CampaignBrief, CampaignProposal, CreativeDraft
-from app.repositories import CampaignRepository
+from app.models.audit import AuditEntry, AuditVerificationResult
+from app.models.campaign import AgentAction, CampaignBrief, CampaignProposal, CreativeDraft
+from app.repositories import AuditRepository, CampaignRepository
 
 
 class CampaignNotFoundError(LookupError):
@@ -20,6 +21,14 @@ class CampaignNotFoundError(LookupError):
 
 
 class CampaignNotPublishedError(RuntimeError):
+    pass
+
+
+class AgentActionNotFoundError(LookupError):
+    pass
+
+
+class AgentActionNotPendingError(RuntimeError):
     pass
 
 
@@ -31,11 +40,13 @@ class CampaignService:
         llm_adapter: LLMAdapter,
         media_adapter: MediaAdapter,
         repository: CampaignRepository,
+        audit_repository: AuditRepository,
     ) -> None:
         self._settings = settings
         self._llm_adapter = llm_adapter
         self._media_adapter = media_adapter
         self._repository = repository
+        self._audit_repository = audit_repository
 
     async def create_proposal(self, brief: CampaignBrief) -> CampaignProposal:
         llm_response = await self._llm_adapter.create_chat_completion(
@@ -76,9 +87,36 @@ class CampaignService:
             )
         )
 
-        return self._repository.save(
+        proposal = self._repository.save(
             CampaignProposal(brief=brief, creative=creative, media_plan=media_plan)
         )
+        self._audit_repository.append(
+            event_type="campaign.proposal.created",
+            actor="system",
+            subject_type="campaign",
+            subject_id=proposal.id,
+            summary="Campaign proposal created from server-side LLM and media planning.",
+            payload={
+                "brief": brief.model_dump(mode="json"),
+                "media_plan_request_id": media_plan.request_id,
+                "creative_source": "mock_llm_adapter",
+            },
+            diff={"status": {"from": None, "to": proposal.status}},
+            guardrail_result={
+                "status": "passed",
+                "checks": [
+                    {
+                        "name": "server_generated_proposal",
+                        "result": "passed",
+                        "message": (
+                            "Creative, media plan, and audit entry were generated "
+                            "server-side."
+                        ),
+                    }
+                ],
+            },
+        )
+        return proposal
 
     def get_campaign(self, campaign_id: str) -> CampaignProposal:
         campaign = self._repository.get(campaign_id)
@@ -93,7 +131,49 @@ class CampaignService:
         campaign = self.get_campaign(campaign_id)
         if campaign.publish_result is not None:
             return campaign
+        if self._find_pending_publish_action(campaign) is not None:
+            return campaign
 
+        action = AgentAction(
+            kind="publish_campaign",
+            payload={
+                "campaign_id": campaign.id,
+                "account_id": self._settings.mock_media_account_id,
+                "placements": [
+                    placement.model_dump(mode="json")
+                    for placement in campaign.media_plan.placements
+                ],
+                "creative": {
+                    "headline": campaign.creative.headline,
+                    "body": campaign.creative.body,
+                    "call_to_action": campaign.creative.call_to_action,
+                },
+            },
+            guardrail_result=self._pending_approval_guardrail_result(campaign),
+        )
+        campaign.actions.append(action)
+        previous_status = campaign.status
+        campaign.status = "draft"
+        saved = self._repository.save(campaign)
+        self._audit_repository.append(
+            event_type="campaign.publish.requested",
+            actor="system",
+            subject_type="campaign",
+            subject_id=campaign.id,
+            summary="Publish action created as pending approval; no media mutation executed.",
+            payload={"action_id": action.id, "action_kind": action.kind},
+            diff={"status": {"from": previous_status, "to": campaign.status}},
+            guardrail_result=action.guardrail_result,
+        )
+        return saved
+
+    async def approve_action(self, campaign_id: str, action_id: str) -> CampaignProposal:
+        campaign = self.get_campaign(campaign_id)
+        action = self._get_action(campaign, action_id)
+        if action.approval_status != "pending_approval":
+            raise AgentActionNotPendingError(action_id)
+
+        previous_status = campaign.status
         publish_result = await self._media_adapter.publish_campaign(
             MediaPublishRequest(
                 account_id=self._settings.mock_media_account_id,
@@ -106,9 +186,49 @@ class CampaignService:
                 },
             )
         )
+        action.approval_status = "approved"
+        action.execution_result = publish_result.model_dump(mode="json")
         campaign.publish_result = publish_result
         campaign.status = publish_result.status
-        return self._repository.save(campaign)
+        saved = self._repository.save(campaign)
+        self._audit_repository.append(
+            event_type="campaign.publish.approved",
+            actor="human",
+            subject_type="campaign",
+            subject_id=campaign.id,
+            summary="Pending publish action approved and submitted through the media adapter.",
+            payload={
+                "action_id": action.id,
+                "external_campaign_id": publish_result.external_campaign_id,
+            },
+            diff={
+                "status": {"from": previous_status, "to": campaign.status},
+                "action": {"approval_status": {"from": "pending_approval", "to": "approved"}},
+            },
+            guardrail_result=action.guardrail_result,
+        )
+        return saved
+
+    def reject_action(self, campaign_id: str, action_id: str) -> CampaignProposal:
+        campaign = self.get_campaign(campaign_id)
+        action = self._get_action(campaign, action_id)
+        if action.approval_status != "pending_approval":
+            raise AgentActionNotPendingError(action_id)
+
+        action.approval_status = "rejected"
+        action.execution_result = {"status": "not_executed"}
+        saved = self._repository.save(campaign)
+        self._audit_repository.append(
+            event_type="campaign.publish.rejected",
+            actor="human",
+            subject_type="campaign",
+            subject_id=campaign.id,
+            summary="Pending publish action rejected; no media mutation executed.",
+            payload={"action_id": action.id},
+            diff={"action": {"approval_status": {"from": "pending_approval", "to": "rejected"}}},
+            guardrail_result=action.guardrail_result,
+        )
+        return saved
 
     async def get_performance(self, campaign_id: str) -> MediaPerformanceResponse:
         campaign = self.get_campaign(campaign_id)
@@ -122,6 +242,13 @@ class CampaignService:
             )
         )
 
+    def list_campaign_audit(self, campaign_id: str) -> list[AuditEntry]:
+        self.get_campaign(campaign_id)
+        return self._audit_repository.list_for_subject("campaign", campaign_id)
+
+    def verify_audit(self) -> AuditVerificationResult:
+        return self._audit_repository.verify()
+
     def _creative_from_llm(self, content: str, brief: CampaignBrief) -> CreativeDraft:
         data = json.loads(content)
         return CreativeDraft(
@@ -131,3 +258,37 @@ class CampaignService:
             hashtags=[f"#{channel}" for channel in brief.channels],
             compliance_notes=["Mock LLM output. Human review required before production use."],
         )
+
+    def _find_pending_publish_action(self, campaign: CampaignProposal) -> AgentAction | None:
+        return next(
+            (
+                action
+                for action in campaign.actions
+                if action.kind == "publish_campaign"
+                and action.approval_status == "pending_approval"
+            ),
+            None,
+        )
+
+    def _get_action(self, campaign: CampaignProposal, action_id: str) -> AgentAction:
+        action = next((action for action in campaign.actions if action.id == action_id), None)
+        if action is None:
+            raise AgentActionNotFoundError(action_id)
+        return action
+
+    def _pending_approval_guardrail_result(self, campaign: CampaignProposal) -> dict:
+        return {
+            "status": "requires_approval",
+            "checks": [
+                {
+                    "name": "human_approval_required",
+                    "result": "requires_approval",
+                    "message": "Publishing is a media mutation and requires human approval.",
+                },
+                {
+                    "name": "budget_positive",
+                    "result": "passed",
+                    "message": f"Budget is {campaign.brief.total_budget_jpy} JPY.",
+                },
+            ],
+        }

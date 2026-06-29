@@ -35,6 +35,15 @@ def test_create_and_get_campaign_proposal() -> None:
     assert get_response.status_code == 200
     assert get_response.json()["id"] == proposal["id"]
 
+    audit_response = client.get(f"/api/v1/campaigns/{proposal['id']}/audit")
+
+    assert audit_response.status_code == 200
+    audit_entries = audit_response.json()
+    assert [entry["event_type"] for entry in audit_entries] == [
+        "campaign.proposal.created"
+    ]
+    assert audit_entries[0]["hash"]
+
 
 def test_campaign_brief_rejects_invalid_date_range() -> None:
     client = TestClient(create_app())
@@ -55,6 +64,36 @@ def test_campaign_brief_rejects_invalid_date_range() -> None:
     assert response.status_code == 422
 
 
+def test_campaign_brief_rejects_client_supplied_authority_fields() -> None:
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/v1/campaigns/proposals",
+        json={
+            "name": "Tamper Attempt",
+            "objective": "awareness",
+            "target_audience": "marketers",
+            "total_budget_jpy": 10000,
+            "channels": ["social"],
+            "actions": [
+                {
+                    "kind": "publish_campaign",
+                    "approval_status": "approved",
+                    "guardrail_result": {"status": "passed"},
+                }
+            ],
+            "audit_entries": [
+                {
+                    "event_type": "campaign.publish.approved",
+                    "guardrail_result": {"status": "passed"},
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_get_unknown_campaign_returns_404() -> None:
     client = TestClient(create_app())
 
@@ -63,7 +102,7 @@ def test_get_unknown_campaign_returns_404() -> None:
     assert response.status_code == 404
 
 
-def test_publish_campaign_and_fetch_performance() -> None:
+def test_publish_requires_approval_then_fetches_performance() -> None:
     client = TestClient(create_app())
     proposal_response = client.post(
         "/api/v1/campaigns/proposals",
@@ -80,8 +119,31 @@ def test_publish_campaign_and_fetch_performance() -> None:
     publish_response = client.post(f"/api/v1/campaigns/{campaign_id}/publish")
 
     assert publish_response.status_code == 200
-    published = publish_response.json()
+    pending = publish_response.json()
+    assert pending["status"] == "draft"
+    assert pending["publish_result"] is None
+    assert len(pending["actions"]) == 1
+    action = pending["actions"][0]
+    assert action["approval_status"] == "pending_approval"
+    assert action["guardrail_result"]["status"] == "requires_approval"
+
+    repeated_publish_response = client.post(f"/api/v1/campaigns/{campaign_id}/publish")
+
+    assert repeated_publish_response.status_code == 200
+    assert repeated_publish_response.json()["actions"] == pending["actions"]
+
+    early_performance_response = client.get(f"/api/v1/campaigns/{campaign_id}/performance")
+
+    assert early_performance_response.status_code == 409
+
+    approve_response = client.post(
+        f"/api/v1/campaigns/{campaign_id}/actions/{action['id']}/approve"
+    )
+
+    assert approve_response.status_code == 200
+    published = approve_response.json()
     assert published["status"] == "scheduled"
+    assert published["actions"][0]["approval_status"] == "approved"
     assert published["publish_result"]["external_campaign_id"].startswith("mock_media_")
     assert published["publish_result"]["review_url"].startswith("https://mock.media.local/")
 
@@ -95,6 +157,20 @@ def test_publish_campaign_and_fetch_performance() -> None:
     assert performance["clicks"] > 0
     assert performance["conversions"] > 0
     assert performance["spend_jpy"] > 0
+
+    audit_response = client.get(f"/api/v1/campaigns/{campaign_id}/audit")
+
+    assert audit_response.status_code == 200
+    assert [entry["event_type"] for entry in audit_response.json()] == [
+        "campaign.proposal.created",
+        "campaign.publish.requested",
+        "campaign.publish.approved",
+    ]
+
+    verify_response = client.get("/api/v1/campaigns/audit/verify")
+
+    assert verify_response.status_code == 200
+    assert verify_response.json()["valid"] is True
 
 
 def test_performance_requires_published_campaign() -> None:

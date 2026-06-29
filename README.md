@@ -35,10 +35,18 @@ python3 -m ruff check .
 - `POST /api/v1/campaigns/proposals` - create a campaign proposal from a brief.
 - `GET /api/v1/campaigns` - list stored campaign proposals.
 - `GET /api/v1/campaigns/{campaign_id}` - fetch a campaign proposal.
-- `POST /api/v1/campaigns/{campaign_id}/publish` - submit a proposed campaign
-  to the mock media API.
+- `POST /api/v1/campaigns/{campaign_id}/publish` - create a server-side
+  `pending_approval` publish action; no media mutation happens yet.
+- `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/approve` - approve
+  and submit a pending publish action to the mock media API.
+- `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/reject` - reject a
+  pending publish action without media mutation.
 - `GET /api/v1/campaigns/{campaign_id}/performance` - fetch mock media
   performance for a submitted campaign.
+- `GET /api/v1/campaigns/{campaign_id}/audit` - list server-generated audit
+  entries for one campaign.
+- `GET /api/v1/campaigns/audit/verify` - verify the append-only audit hash
+  chain.
 
 Example proposal request:
 
@@ -62,6 +70,8 @@ Example proposal request:
   generation, mock media planning, in-memory persistence, and campaign APIs.
 - Milestone 3: mock publish and performance workflow using the same media
   adapter boundary intended for real media API replacement.
+- Milestone 4: server-generated append-only audit ledger with hash-chain
+  verification and human approval gating before publish mutation.
 
 ## Acceptance checklist
 
@@ -74,6 +84,10 @@ Example proposal request:
   request/response models.
 - [x] Mock adapters are the default and only implemented adapters in this MVP.
 - [x] Campaign proposal, publish, and performance flows have API tests.
+- [x] Publish requests create `pending_approval` actions before any media
+  mutation.
+- [x] Audit entries are generated only on the server and verified through a
+  hash chain.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions
