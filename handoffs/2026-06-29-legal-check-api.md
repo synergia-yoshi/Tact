@@ -1,4 +1,4 @@
-# Tact Handoff
+# 2026-06-29 Legal Check API Snapshot
 
 ## 1. 対象の実体
 

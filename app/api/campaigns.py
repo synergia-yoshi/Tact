@@ -7,10 +7,12 @@ from app.auth import AuthContext, get_auth_context
 from app.dependencies import get_campaign_service
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import CampaignBrief, CampaignProposal
+from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
 from app.services import (
     AgentActionNotFoundError,
     AgentActionNotPendingError,
+    CampaignLegalCheckRequiredError,
     CampaignMeasurementRequiredError,
     CampaignNotFoundError,
     CampaignNotPublishedError,
@@ -82,6 +84,11 @@ async def publish_campaign(
             status_code=status.HTTP_409_CONFLICT,
             detail="Measurement snapshot required before publish approval can be requested",
         ) from error
+    except CampaignLegalCheckRequiredError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Passed legal check required before publish approval can be requested",
+        ) from error
 
 
 @router.post("/{campaign_id}/measurements/refresh", response_model=MetricSnapshot)
@@ -118,6 +125,42 @@ async def get_latest_campaign_measurement(
             detail="Measurement snapshot not found",
         )
     return snapshot
+
+
+@router.post("/{campaign_id}/legal-checks/run", response_model=LegalCheckResult)
+async def run_campaign_legal_check(
+    campaign_id: str,
+    service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+) -> LegalCheckResult:
+    try:
+        return service.run_legal_check(campaign_id, auth_context)
+    except CampaignNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        ) from error
+
+
+@router.get("/{campaign_id}/legal-checks/latest", response_model=LegalCheckResult)
+async def get_latest_campaign_legal_check(
+    campaign_id: str,
+    service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+) -> LegalCheckResult:
+    try:
+        result = service.latest_legal_check(campaign_id, auth_context)
+    except CampaignNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        ) from error
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Legal check not found",
+        )
+    return result
 
 
 @router.post("/{campaign_id}/actions/{action_id}/approve", response_model=CampaignProposal)

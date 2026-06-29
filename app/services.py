@@ -13,8 +13,10 @@ from app.adapters.media import (
 )
 from app.auth import AuthContext
 from app.config import Settings
+from app.legal_checks import run_rule_based_legal_check
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import AgentAction, CampaignBrief, CampaignProposal, CreativeDraft
+from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
 from app.repositories import AuditRepository, CampaignRepository
 
@@ -28,6 +30,10 @@ class CampaignNotPublishedError(RuntimeError):
 
 
 class CampaignMeasurementRequiredError(RuntimeError):
+    pass
+
+
+class CampaignLegalCheckRequiredError(RuntimeError):
     pass
 
 
@@ -165,6 +171,8 @@ class CampaignService:
             return campaign
         if not campaign.metric_snapshots:
             raise CampaignMeasurementRequiredError(campaign_id)
+        if not campaign.legal_checks or campaign.legal_checks[-1].status != "passed":
+            raise CampaignLegalCheckRequiredError(campaign_id)
         if self._find_pending_publish_action(campaign) is not None:
             return campaign
 
@@ -346,6 +354,58 @@ class CampaignService:
         if not campaign.metric_snapshots:
             return None
         return campaign.metric_snapshots[-1]
+
+    def run_legal_check(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> LegalCheckResult:
+        auth_context = auth_context or AuthContext.dev()
+        campaign = self.get_campaign(campaign_id, auth_context)
+        result = run_rule_based_legal_check(
+            texts=[
+                campaign.creative.headline,
+                campaign.creative.body,
+                campaign.creative.call_to_action,
+                *campaign.creative.hashtags,
+            ]
+        )
+        campaign.legal_checks.append(result)
+        self._repository.save(campaign)
+        self._audit_repository.append(
+            event_type="campaign.legal_check.completed",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
+            subject_type="campaign",
+            subject_id=campaign.id,
+            summary="Rule-based legal check completed for campaign creative.",
+            payload={
+                "legal_check_id": result.id,
+                "status": result.status,
+                "finding_count": len(result.findings),
+            },
+            guardrail_result={
+                "status": result.status,
+                "checks": [
+                    {
+                        "name": "legal_check_before_publish",
+                        "result": result.status,
+                        "message": "Rule-based 薬機法/景表法 check ran before publish.",
+                    }
+                ],
+            },
+        )
+        return result
+
+    def latest_legal_check(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> LegalCheckResult | None:
+        campaign = self.get_campaign(campaign_id, auth_context)
+        if not campaign.legal_checks:
+            return None
+        return campaign.legal_checks[-1]
 
     def list_campaign_audit(
         self,

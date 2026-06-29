@@ -7,6 +7,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.adapters.media import MediaPlanResponse, MediaPublishResponse
+from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
 
 CampaignStatus = Literal["proposed", "draft", "scheduled", "published", "failed"]
@@ -59,6 +60,7 @@ class CampaignProposal(BaseModel):
     creative: CreativeDraft
     media_plan: MediaPlanResponse
     metric_snapshots: list[MetricSnapshot] = Field(default_factory=list)
+    legal_checks: list[LegalCheckResult] = Field(default_factory=list)
     actions: list[AgentAction] = Field(default_factory=list)
     publish_result: MediaPublishResponse | None = None
     status: CampaignStatus = "proposed"
