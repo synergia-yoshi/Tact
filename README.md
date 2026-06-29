@@ -46,6 +46,10 @@ python3 -m ruff check .
   薬機法/景表法 copy checks.
 - `GET /api/v1/campaigns/{campaign_id}/legal-checks/latest` - return the latest
   legal check result.
+- `POST /api/v1/campaigns/{campaign_id}/kill-switch/evaluate` - evaluate media
+  delivery status for emergency-stop decisions.
+- `GET /api/v1/campaigns/{campaign_id}/kill-switch/latest` - return the latest
+  Kill Switch evaluation.
 - `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/approve` - approve
   and submit a pending publish action to the mock media API.
 - `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/reject` - reject a
@@ -87,6 +91,8 @@ Example proposal request:
   snapshot before publish approval can be requested.
 - Milestone 7: rule-based legal-check API that must pass before publish
   approval can be requested.
+- Milestone 8: Kill Switch evaluation API that is explicit about simulated
+  media status while real media stop APIs are not connected.
 
 ## Persistence and secrets
 
@@ -162,6 +168,8 @@ tenant headers such as `x-tact-org`.
 - [x] Publish approval requests require a read-only measurement snapshot first.
 - [x] Metric snapshots label values as simulated/measured and carry confidence.
 - [x] Publish approval requests require a passed rule-based legal check first.
+- [x] Kill Switch evaluation is audited and explicitly marks mock media status
+  as simulated.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions

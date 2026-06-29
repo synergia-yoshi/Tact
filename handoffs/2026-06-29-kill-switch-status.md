@@ -1,4 +1,4 @@
-# Tact Handoff
+# 2026-06-29 Kill Switch Status Snapshot
 
 ## 1. 対象の実体
 

@@ -6,6 +6,7 @@ from app.adapters.llm import LLMAdapter, LLMChatRequest, LLMMessage
 from app.adapters.measurement import MeasurementAdapter, MeasurementReadRequest
 from app.adapters.media import (
     MediaAdapter,
+    MediaDeliveryStatusRequest,
     MediaPerformanceRequest,
     MediaPerformanceResponse,
     MediaPlanRequest,
@@ -16,6 +17,7 @@ from app.config import Settings
 from app.legal_checks import run_rule_based_legal_check
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import AgentAction, CampaignBrief, CampaignProposal, CreativeDraft
+from app.models.kill_switch import KillSwitchResult
 from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
 from app.repositories import AuditRepository, CampaignRepository
@@ -406,6 +408,76 @@ class CampaignService:
         if not campaign.legal_checks:
             return None
         return campaign.legal_checks[-1]
+
+    async def evaluate_kill_switch(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> KillSwitchResult:
+        auth_context = auth_context or AuthContext.dev()
+        campaign = self.get_campaign(campaign_id, auth_context)
+        if campaign.publish_result is None:
+            result = KillSwitchResult(
+                status="clear",
+                data_kind="simulated",
+                reason="No external campaign is published yet; no real stop action exists.",
+                media_status={"external_campaign_id": None, "active": False, "health": "unknown"},
+            )
+        else:
+            media_status = await self._media_adapter.get_delivery_status(
+                MediaDeliveryStatusRequest(
+                    account_id=self._settings.mock_media_account_id,
+                    external_campaign_id=campaign.publish_result.external_campaign_id,
+                )
+            )
+            should_stop = media_status.active and media_status.health in {"degraded", "unknown"}
+            result = KillSwitchResult(
+                status="would_stop" if should_stop else "clear",
+                data_kind=media_status.data_kind,
+                reason=(
+                    "Mock media status is simulated; no real stop mutation was executed."
+                    if media_status.data_kind == "simulated"
+                    else "Media status checked through adapter boundary."
+                ),
+                media_status=media_status.model_dump(mode="json"),
+            )
+
+        campaign.kill_switch_results.append(result)
+        self._repository.save(campaign)
+        self._audit_repository.append(
+            event_type="campaign.kill_switch.evaluated",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
+            subject_type="campaign",
+            subject_id=campaign.id,
+            summary="Kill Switch evaluated through media status boundary.",
+            payload={
+                "kill_switch_result_id": result.id,
+                "status": result.status,
+                "data_kind": result.data_kind,
+            },
+            guardrail_result={
+                "status": result.status,
+                "checks": [
+                    {
+                        "name": "kill_switch_status",
+                        "result": result.status,
+                        "message": result.reason,
+                    }
+                ],
+            },
+        )
+        return result
+
+    def latest_kill_switch_result(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> KillSwitchResult | None:
+        campaign = self.get_campaign(campaign_id, auth_context)
+        if not campaign.kill_switch_results:
+            return None
+        return campaign.kill_switch_results[-1]
 
     def list_campaign_audit(
         self,
