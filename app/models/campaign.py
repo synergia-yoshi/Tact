@@ -11,6 +11,7 @@ from app.models.kill_switch import KillSwitchResult
 from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
 
+AutonomyLevel = Literal["full_auto", "approval_only", "guided"]
 CampaignStatus = Literal["proposed", "draft", "scheduled", "published", "failed"]
 ApprovalStatus = Literal["pending_approval", "approved", "rejected"]
 
@@ -27,6 +28,7 @@ class CampaignBrief(BaseModel):
     end_date: date | None = None
     kpis: list[str] = Field(default_factory=list)
     tone: str = Field(default="clear and practical", max_length=120)
+    autonomy_level: AutonomyLevel = "approval_only"
 
     @model_validator(mode="after")
     def validate_dates(self) -> CampaignBrief:

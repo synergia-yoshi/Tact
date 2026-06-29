@@ -1,0 +1,129 @@
+export type Role = "operator" | "approver" | "admin";
+export type RouteName =
+  | "home"
+  | "campaigns"
+  | "dashboard"
+  | "tasks"
+  | "creative"
+  | "audit"
+  | "settings";
+export type AutonomyLevel = "full_auto" | "approval_only" | "guided";
+export type DataKind = "measured" | "simulated";
+
+export interface CampaignBrief {
+  name: string;
+  objective: string;
+  target_audience: string;
+  total_budget_jpy: number;
+  channels: string[];
+  kpis: string[];
+  tone: string;
+  autonomy_level: AutonomyLevel;
+}
+
+export interface CreativeDraft {
+  headline: string;
+  body: string;
+  call_to_action: string;
+  hashtags: string[];
+  compliance_notes: string[];
+}
+
+export interface MediaPlacement {
+  channel: string;
+  budget_jpy: number;
+  objective: string;
+  targeting: Record<string, string | string[]>;
+  creative_spec: Record<string, string>;
+}
+
+export interface MediaPlan {
+  request_id: string;
+  account_id: string;
+  placements: MediaPlacement[];
+  estimated_reach: number;
+  estimated_cpa_jpy: number;
+  generated_at: string;
+}
+
+export interface AgentAction {
+  id: string;
+  kind: "publish_campaign";
+  payload: Record<string, unknown>;
+  guardrail_result: Record<string, unknown>;
+  approval_status: "pending_approval" | "approved" | "rejected";
+  execution_result: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface MetricSnapshot {
+  id: string;
+  source: "ga4_shopify_mock" | "ga4_shopify";
+  data_kind: DataKind;
+  sessions: number;
+  conversions: number;
+  orders: number;
+  revenue_jpy: number;
+  ad_spend_jpy: number;
+  cpa_jpy: number;
+  roas: number;
+  confidence: number;
+  labels: Record<string, DataKind>;
+  measured_at: string;
+}
+
+export interface LegalCheckResult {
+  id: string;
+  source: string;
+  status: "passed" | "needs_review" | "blocked";
+  findings: unknown[];
+  checked_at: string;
+}
+
+export interface PublishResult {
+  request_id: string;
+  external_campaign_id: string;
+  status: "draft" | "scheduled" | "published" | "failed";
+  review_url: string | null;
+  submitted_at: string;
+}
+
+export interface CampaignProposal {
+  id: string;
+  org_id: string;
+  created_by: string;
+  brief: CampaignBrief;
+  creative: CreativeDraft;
+  media_plan: MediaPlan;
+  metric_snapshots: MetricSnapshot[];
+  legal_checks: LegalCheckResult[];
+  actions: AgentAction[];
+  publish_result: PublishResult | null;
+  status: "proposed" | "draft" | "scheduled" | "published" | "failed";
+  created_at: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  event_type: string;
+  actor: string;
+  summary: string;
+  hash: string;
+  prev_hash: string | null;
+  created_at: string;
+}
+
+export interface DevTokenResponse {
+  token: string | null;
+  actor_id: string;
+  org_id: string;
+  roles: Role[];
+  expires_at: string | null;
+  auth_mode: string;
+}
+
+export interface UiError {
+  status: number;
+  message: string;
+  detail: string;
+}

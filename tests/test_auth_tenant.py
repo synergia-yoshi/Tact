@@ -154,6 +154,40 @@ def test_audit_verify_requires_admin_role(signed_auth_env: None) -> None:
     assert allowed_response.json()["valid"] is True
 
 
+def test_local_dev_token_can_be_used_for_signed_bearer_auth(
+    signed_auth_env: None,
+) -> None:
+    client = TestClient(create_app())
+
+    token_response = client.post("/api/v1/auth/dev-token", json={"role": "approver"})
+
+    assert token_response.status_code == 200
+    token_payload = token_response.json()
+    assert token_payload["auth_mode"] == "signed_bearer"
+    assert token_payload["roles"] == ["approver"]
+    assert token_payload["expires_at"]
+
+    list_response = client.get(
+        "/api/v1/campaigns",
+        headers={"Authorization": f"Bearer {token_payload['token']}"},
+    )
+
+    assert list_response.status_code == 200
+
+
+def test_dev_token_minting_is_rejected_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_MODE", "signed_bearer")
+    monkeypatch.setenv("AUTH_TOKEN_SECRET", AUTH_SECRET)
+    _clear_dependency_caches()
+    client = TestClient(create_app())
+
+    response = client.post("/api/v1/auth/dev-token", json={"role": "operator"})
+
+    assert response.status_code == 403
+    _clear_dependency_caches()
+
+
 def _headers(
     *,
     actor_id: str,
