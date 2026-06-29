@@ -10,6 +10,11 @@ export type RouteName =
 export type AutonomyLevel = "full_auto" | "approval_only" | "guided";
 export type DataKind = "measured" | "simulated";
 export type EstimateSource = "mock" | "model" | "measured";
+export type MetricSource =
+  | "ga4_shopify_mock"
+  | "ga4_shopify"
+  | "media_plan_mock"
+  | "mock_media";
 
 export interface EstimateRange {
   low: number;
@@ -84,7 +89,17 @@ export interface MetricSnapshot {
   conversions_range: EstimateRange | null;
   confidence: number;
   labels: Record<string, DataKind>;
+  series: Record<string, MetricSeriesPoint[]>;
   measured_at: string;
+}
+
+export interface MetricSeriesPoint {
+  timestamp: string;
+  value: number | null;
+  data_kind: DataKind;
+  source: MetricSource;
+  low: number | null;
+  high: number | null;
 }
 
 export interface LegalCheckResult {
@@ -103,6 +118,15 @@ export interface PublishResult {
   submitted_at: string;
 }
 
+export interface KillSwitchResult {
+  id: string;
+  status: "clear" | "would_stop" | "stopped";
+  data_kind: DataKind;
+  reason: string;
+  media_status: Record<string, unknown>;
+  checked_at: string;
+}
+
 export interface CampaignProposal {
   id: string;
   org_id: string;
@@ -112,10 +136,76 @@ export interface CampaignProposal {
   media_plan: MediaPlan;
   metric_snapshots: MetricSnapshot[];
   legal_checks: LegalCheckResult[];
+  kill_switch_results: KillSwitchResult[];
   actions: AgentAction[];
   publish_result: PublishResult | null;
   status: "proposed" | "draft" | "scheduled" | "published" | "failed";
   created_at: string;
+}
+
+export type DashboardPeriod = "7d" | "28d" | "all";
+export type DashboardChannelFilter = "all" | "search" | "social" | "display";
+
+export interface DashboardMetric {
+  key:
+    | "planned_budget_jpy"
+    | "ad_spend_jpy"
+    | "roas"
+    | "cpa_jpy"
+    | "conversions"
+    | "revenue_jpy";
+  label: string;
+  value: number | null;
+  unit: "jpy" | "ratio" | "count";
+  status: "available" | "measurement_pending" | "not_applicable";
+  data_kind: DataKind | null;
+  source: MetricSource | null;
+  estimate_range: EstimateRange | null;
+  series: MetricSeriesPoint[];
+}
+
+export interface ChannelDashboardRow {
+  channel: string;
+  label: string;
+  status: "pending" | "active" | "stopped" | "test";
+  planned_budget_jpy: DashboardMetric;
+  ad_spend_jpy: DashboardMetric;
+  roas: DashboardMetric;
+  cpa_jpy: DashboardMetric;
+  conversions: DashboardMetric;
+  series: MetricSeriesPoint[];
+}
+
+export interface ImprovementCycle {
+  stage: "brief" | "creative" | "measurement" | "publish" | "improvement";
+  title: string;
+  changed: string;
+  result: string;
+  source: MetricSource | null;
+  data_kind: DataKind | null;
+  occurred_at: string;
+  evidence_event_type: string | null;
+}
+
+export interface KillSwitchDashboardState {
+  status: "not_checked" | "clear" | "would_stop" | "stopped";
+  label: string;
+  reason: string;
+  data_kind: DataKind | null;
+  source: MetricSource | null;
+  checked_at: string | null;
+}
+
+export interface CampaignDashboard {
+  campaign_id: string;
+  campaign_name: string;
+  period: DashboardPeriod;
+  channel_filter: DashboardChannelFilter;
+  kpis: DashboardMetric[];
+  channels: ChannelDashboardRow[];
+  improvement_cycles: ImprovementCycle[];
+  kill_switch: KillSwitchDashboardState;
+  generated_at: string;
 }
 
 export interface AuditEntry {

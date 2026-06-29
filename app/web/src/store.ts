@@ -1,7 +1,10 @@
 import type {
   AuditEntry,
   AuditVerificationResult,
+  CampaignDashboard,
   CampaignProposal,
+  DashboardChannelFilter,
+  DashboardPeriod,
   DevTokenResponse,
   Role,
   RouteName,
@@ -13,6 +16,9 @@ export type LoadingOperation =
   | "createCampaign"
   | "runPublishGate"
   | "approveAction"
+  | "loadDashboard"
+  | "checkKillSwitch"
+  | "requestKillSwitchStop"
   | "loadAudit"
   | "verifyAudit";
 
@@ -29,6 +35,11 @@ export interface AppState {
   auth: DevTokenResponse | null;
   campaigns: CampaignProposal[];
   activeCampaignId: string | null;
+  dashboard: CampaignDashboard | null;
+  dashboardFilters: {
+    period: DashboardPeriod;
+    channel: DashboardChannelFilter;
+  };
   auditEntries: AuditEntry[];
   loading: LoadingState | null;
   failedOperation: LoadingState | null;
@@ -45,6 +56,11 @@ const state: AppState = {
   auth: null,
   campaigns: [],
   activeCampaignId: null,
+  dashboard: null,
+  dashboardFilters: {
+    period: "28d",
+    channel: "all",
+  },
   auditEntries: [],
   loading: null,
   failedOperation: null,

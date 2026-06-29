@@ -52,6 +52,12 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   );
   await expect(creativeView.getByText(`確かさ ${reachConfidence}%`)).toBeVisible();
 
+  await page.getByRole("button", { name: "成果" }).click();
+  await expect(page.getByText("計測が入るまで、成果のグラフは表示しません。")).toBeVisible();
+  await expect(page.locator("#performance-chart")).toHaveCount(0);
+  await expect(page.getByText("媒体別ステータス")).toBeVisible();
+  await page.getByRole("button", { name: "広告素材" }).click();
+
   await page.getByRole("button", { name: "出す前の確認へ進む" }).click();
   await expect(page.locator("#tasks-title")).toBeVisible();
   await expect(
@@ -66,15 +72,47 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   await page.getByRole("button", { name: "広告を出すことを承認" }).click();
   await expect(page.locator("#dashboard-title")).toBeVisible();
   await expect(page.getByText("広告を出した状態 / テスト用の結果")).toBeVisible();
-  await expect(page.getByText("緊急停止:")).toBeVisible();
+  await expect(page.getByText("媒体別ステータス")).toBeVisible();
+  await expect(page.locator(".channel-row")).toHaveCount(3);
+  await expect(page.getByText("改善ループ履歴")).toBeVisible();
+  await expect(page.getByText("次の改善案")).toBeVisible();
+  await expect(page.getByText("Kill Switch")).toBeVisible();
   await expect(page.locator("#performance-chart")).toBeVisible();
-  await expect(page.getByText("履歴グラフは未接続")).toBeVisible();
+  await expect(page.getByText("履歴あり")).toBeVisible();
+  await expect(page.getByText("データなし").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "SNS" }).click();
+  await expect(page.locator(".channel-row")).toHaveCount(1);
+  await expect(page.locator(".channel-status-list").getByText("SNS広告")).toBeVisible();
+  await page.getByRole("button", { name: "全体" }).click();
+  await expect(page.locator(".channel-row")).toHaveCount(3);
 
   await page.locator("#performance-chart").evaluate((element) => {
     element.setAttribute("data-probe", "stable");
   });
-  await page.getByRole("button", { name: "管理者" }).click();
+  await page.getByRole("button", { name: "担当者" }).click();
+  await expect(page.locator("[data-kill-stop]")).toBeDisabled();
   await expect(page.locator("#performance-chart")).toHaveAttribute("data-probe", "stable");
+  await page.getByRole("button", { name: "承認者" }).click();
+  await expect(page.locator("#performance-chart")).toHaveAttribute("data-probe", "stable");
+  await expect(page.locator("[data-kill-stop]")).toBeEnabled();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".dash-top .kpi-card").first()).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    )
+    .toBe(true);
+
+  await page.locator("[data-kill-stop]").click();
+  await expect(page.locator(".kill-panel").getByText("停止想定")).toBeVisible();
+  await page.getByRole("button", { name: "記録" }).click();
+  await expect(
+    page.locator("#audit-content .data-label").getByText("止める想定を確認", { exact: true }),
+  ).toBeVisible();
 });
 
 test("admin-only audit verification is surfaced in the UI", async ({ page }) => {

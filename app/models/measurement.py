@@ -9,6 +9,21 @@ from pydantic import BaseModel, Field
 from app.models.estimation import EstimateRange
 
 MetricDataKind = Literal["measured", "simulated"]
+MetricSource = Literal[
+    "ga4_shopify_mock",
+    "ga4_shopify",
+    "media_plan_mock",
+    "mock_media",
+]
+
+
+class MetricSeriesPoint(BaseModel):
+    timestamp: datetime
+    value: float | None = None
+    data_kind: MetricDataKind
+    source: MetricSource
+    low: float | None = None
+    high: float | None = None
 
 
 class MetricSnapshot(BaseModel):
@@ -27,4 +42,5 @@ class MetricSnapshot(BaseModel):
     conversions_range: EstimateRange | None = None
     confidence: float = Field(ge=0, le=1)
     labels: dict[str, MetricDataKind]
+    series: dict[str, list[MetricSeriesPoint]] = Field(default_factory=dict)
     measured_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))

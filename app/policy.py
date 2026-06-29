@@ -21,7 +21,7 @@ POLICY_MATRIX: dict[PolicyOperation, frozenset[str]] = {
     "legal.override": frozenset({"admin"}),
     "audit.verify": frozenset({"admin"}),
     "kill_switch.evaluate": frozenset({"operator", "approver", "admin"}),
-    "kill_switch.stop": frozenset({"admin"}),
+    "kill_switch.stop": frozenset({"approver", "admin"}),
 }
 
 
