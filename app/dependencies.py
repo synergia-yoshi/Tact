@@ -1,15 +1,28 @@
+from dataclasses import dataclass
 from functools import lru_cache
 
 from app.adapters.llm import LLMAdapter, MockLLMAdapter
 from app.adapters.media import MediaAdapter, MockMediaAdapter
 from app.config import Settings, get_settings
+from app.firestore_repositories import (
+    FirestoreAuditRepository,
+    FirestoreCampaignRepository,
+    create_firestore_client,
+)
 from app.repositories import (
     AuditRepository,
     CampaignRepository,
     InMemoryAuditRepository,
     InMemoryCampaignRepository,
 )
+from app.secrets import GoogleSecretManagerResolver, PlainSecretResolver, SecretResolver
 from app.services import CampaignService
+
+
+@dataclass(frozen=True)
+class RepositoryBundle:
+    campaign: CampaignRepository
+    audit: AuditRepository
 
 
 @lru_cache
@@ -33,13 +46,48 @@ def settings_dependency() -> Settings:
 
 
 @lru_cache
+def get_repository_bundle() -> RepositoryBundle:
+    settings = get_settings()
+    if settings.storage_backend == "memory":
+        return RepositoryBundle(
+            campaign=InMemoryCampaignRepository(),
+            audit=InMemoryAuditRepository(),
+        )
+    if settings.storage_backend == "firestore":
+        client = create_firestore_client(
+            project_id=settings.gcp_project_id,
+            database=settings.firestore_database,
+        )
+        return RepositoryBundle(
+            campaign=FirestoreCampaignRepository(
+                client=client,
+                collection_prefix=settings.firestore_collection_prefix,
+            ),
+            audit=FirestoreAuditRepository(
+                client=client,
+                collection_prefix=settings.firestore_collection_prefix,
+            ),
+        )
+    raise NotImplementedError(f"Unsupported storage backend: {settings.storage_backend}")
+
+
 def get_campaign_repository() -> CampaignRepository:
-    return InMemoryCampaignRepository()
+    return get_repository_bundle().campaign
+
+
+def get_audit_repository() -> AuditRepository:
+    return get_repository_bundle().audit
 
 
 @lru_cache
-def get_audit_repository() -> AuditRepository:
-    return InMemoryAuditRepository()
+def get_secret_resolver() -> SecretResolver:
+    settings = get_settings()
+    if any(
+        GoogleSecretManagerResolver.is_secret_ref(value)
+        for value in (settings.media_api_key, settings.llm_api_key)
+    ):
+        return GoogleSecretManagerResolver(project_id=settings.gcp_project_id)
+    return PlainSecretResolver()
 
 
 def get_campaign_service() -> CampaignService:
