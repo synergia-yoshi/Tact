@@ -1,4 +1,27 @@
-import type { AuditEntry, CampaignProposal, DevTokenResponse, Role, RouteName, UiError } from "./types";
+import type {
+  AuditEntry,
+  AuditVerificationResult,
+  CampaignProposal,
+  DevTokenResponse,
+  Role,
+  RouteName,
+  UiError,
+} from "./types";
+
+export type LoadingOperation =
+  | "switchRole"
+  | "createCampaign"
+  | "runPublishGate"
+  | "approveAction"
+  | "loadAudit"
+  | "verifyAudit";
+
+export interface LoadingState {
+  operation: LoadingOperation;
+  targetId?: string;
+  role?: Role;
+  phase?: string;
+}
 
 export interface AppState {
   route: RouteName;
@@ -7,9 +30,11 @@ export interface AppState {
   campaigns: CampaignProposal[];
   activeCampaignId: string | null;
   auditEntries: AuditEntry[];
-  loading: boolean;
+  loading: LoadingState | null;
+  failedOperation: LoadingState | null;
   error: UiError | null;
-  auditVerification: unknown | null;
+  auditVerification: AuditVerificationResult | null;
+  devTokenAvailable: boolean | null;
 }
 
 type Listener = (state: AppState) => void;
@@ -21,9 +46,11 @@ const state: AppState = {
   campaigns: [],
   activeCampaignId: null,
   auditEntries: [],
-  loading: false,
+  loading: null,
+  failedOperation: null,
   error: null,
   auditVerification: null,
+  devTokenAvailable: null,
 };
 
 const listeners = new Set<Listener>();

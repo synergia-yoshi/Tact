@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tact — Marketing Autonomy Engine</title>
+    <title>Tact — 広告運用アシスタント</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,7 +14,7 @@
   </head>
   <body>
     <div class="shell">
-      <aside class="sidebar" aria-label="Tact navigation">
+      <aside class="sidebar" aria-label="Tact メニュー">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8" /><path d="M21 7v5" /><path d="M16 7h5" /></svg>
@@ -23,14 +23,14 @@
         </div>
         <button class="btn primary new-campaign" type="button" data-route="home">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-          新規キャンペーン
+          新しい広告案
         </button>
         <nav class="nav-list" id="nav-list"></nav>
         <div class="account-card">
-          <span class="avatar" aria-hidden="true" id="role-avatar">O</span>
+          <span class="avatar" aria-hidden="true" id="role-avatar">担</span>
           <span>
-            <strong id="role-label">operator</strong>
-            <small id="auth-mode-label">signed_bearer</small>
+            <strong id="role-label">担当者</strong>
+            <small id="auth-mode-label">確認中</small>
           </span>
         </div>
       </aside>
@@ -38,47 +38,49 @@
       <main class="main">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Marketing Autonomy Engine</p>
+            <p class="eyebrow">広告運用アシスタント</p>
             <h1 id="page-title">ホーム</h1>
           </div>
           <div class="topbar-actions">
-            <div class="role-switcher" aria-label="ロール切替">
-              <button type="button" class="role-button active" data-role="operator">operator</button>
-              <button type="button" class="role-button" data-role="approver">approver</button>
-              <button type="button" class="role-button" data-role="admin">admin</button>
+            <div class="role-switcher" id="role-switcher" aria-label="権限切替" hidden>
+              <button type="button" class="role-button active" data-role="operator">担当者</button>
+              <button type="button" class="role-button" data-role="approver">承認者</button>
+              <button type="button" class="role-button" data-role="admin">管理者</button>
             </div>
             <span class="status-pill neutral" id="server-label">接続確認中</span>
           </div>
         </header>
 
-        <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+        <div class="toast" id="toast" role="alert" aria-live="assertive" hidden></div>
 
         <section class="view active" id="view-home" aria-labelledby="home-title">
           <div class="hero-panel">
             <div>
               <p class="eyebrow centerless">3問で開始</p>
-              <h2 id="home-title">マーケの作業は、ぜんぶAIに。<br /><span>人にしかできない仕事に、集中を。</span></h2>
+              <h2 id="home-title">広告づくりを、3問から。<br /><span>出す前の確認まで、ひとつずつ進めます。</span></h2>
               <p class="lead">
-                入力から生成、計測・法務ゲート、承認、ダッシュボードまでをサーバー権威で通します。
+                商材・予算・任せる範囲を入れると、広告文と出し先の案を作ります。広告を出す前には、数字と表現を確認します。
               </p>
             </div>
             <div class="policy-card">
-              <span class="policy-kicker">Policy Matrix</span>
-              <strong>配信開始・予算変更は常に承認制</strong>
-              <p>関与度が高くても、publish は pending_approval を必ず通ります。</p>
+              <span class="policy-kicker">安心ルール</span>
+              <strong>広告を出す前・予算変更は必ず人が確認</strong>
+              <p>自動作成で案を出しても、広告を出す前の最終確認は人が行います。</p>
             </div>
           </div>
+
+          <div id="generation-stepper-content"></div>
 
           <form class="question-stack" id="campaign-form">
             <article class="question-card">
               <span class="question-number">01</span>
               <div>
                 <label for="product-input">何を宣伝しますか？</label>
-                <input id="product-input" name="product" class="text-input" value="オーガニックスキンケアのD2C" required />
+                <input id="product-input" name="product" class="text-input" value="オーガニック化粧品の通販" required />
                 <div class="chips" aria-label="業種チップ">
-                  <button type="button" class="chip selected" data-product="オーガニックスキンケアのD2C">スキンケアD2C</button>
+                  <button type="button" class="chip selected" data-product="オーガニック化粧品の通販">スキンケア通販</button>
                   <button type="button" class="chip" data-product="美容サロンの初回予約">美容サロン</button>
-                  <button type="button" class="chip" data-product="勤怠管理SaaS">BtoB SaaS</button>
+                  <button type="button" class="chip" data-product="法人向け勤怠ツール">法人向けツール</button>
                   <button type="button" class="chip" data-product="クラフトバルの来店予約">クラフトバル</button>
                 </div>
               </div>
@@ -88,29 +90,29 @@
               <div>
                 <label for="budget-range">月の予算は？</label>
                 <div class="budget-value"><b id="budget-value">¥500,000</b><span>/ 月</span></div>
-                <input id="budget-range" name="budget" type="range" min="10" max="100" value="50" step="5" />
+                <input id="budget-range" name="budget" type="range" min="10" max="500" value="50" step="10" />
                 <div class="goal-pills" aria-label="ゴール">
                   <button type="button" class="goal-pill selected" data-objective="conversion">売上</button>
                   <button type="button" class="goal-pill" data-objective="lead_generation">新規顧客</button>
-                  <button type="button" class="goal-pill" data-objective="efficiency">獲得効率</button>
+                  <button type="button" class="goal-pill" data-objective="efficiency">費用対効果を最大化</button>
                 </div>
               </div>
             </article>
             <article class="question-card">
               <span class="question-number">03</span>
               <div>
-                <p class="field-label">どこまでAIにまかせますか？</p>
+                <p class="field-label">どこまで自動作成にまかせますか？</p>
                 <div class="choice-cards">
-                  <button type="button" class="choice-card" data-autonomy="full_auto">全部まかせる<span>低リスク・可逆・枠内のみ自動化</span></button>
-                  <button type="button" class="choice-card selected" data-autonomy="approval_only">重要な判断だけ確認 <em>推奨</em><span>publish と予算変更は承認制</span></button>
-                  <button type="button" class="choice-card" data-autonomy="guided">じっくり一緒に<span>各ステップを確認</span></button>
+                  <button type="button" class="choice-card selected" data-autonomy="approval_only">おまかせ <em>推奨</em><span>作成から配信案・改善までAIが進めます</span></button>
+                  <button type="button" class="choice-card" data-autonomy="guided">一緒に<span>各ステップを確認しながら進めます</span></button>
                 </div>
+                <p class="policy-note">どちらを選んでも、広告を出す前・予算変更は必ず人が確認します。</p>
               </div>
             </article>
             <div class="action-row">
-              <p>生成後、計測・法務チェックを通して承認キューへ送ります。</p>
+              <p>作成後、数字と表現を確認して、最終確認へ送ります。</p>
               <button class="btn primary" type="submit" id="create-button">
-                プランを作成する
+                広告案を作成する
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
               </button>
             </div>
@@ -120,8 +122,8 @@
         <section class="view" id="view-campaigns" aria-labelledby="campaigns-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Campaigns</p>
-              <h2 id="campaigns-title">キャンペーン</h2>
+              <p class="eyebrow">広告案一覧</p>
+              <h2 id="campaigns-title">広告案</h2>
             </div>
           </div>
           <div id="campaigns-content"></div>
@@ -130,8 +132,8 @@
         <section class="view" id="view-dashboard" aria-labelledby="dashboard-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Dashboard</p>
-              <h2 id="dashboard-title">ダッシュボード</h2>
+              <p class="eyebrow">成果確認</p>
+              <h2 id="dashboard-title">成果</h2>
             </div>
             <span class="loop-badge"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg> 改善ループ</span>
           </div>
@@ -141,10 +143,10 @@
         <section class="view" id="view-tasks" aria-labelledby="tasks-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Approval Queue</p>
-              <h2 id="tasks-title">タスク</h2>
+              <p class="eyebrow">最終確認</p>
+              <h2 id="tasks-title">確認待ち</h2>
             </div>
-            <span class="status-pill amber">承認制</span>
+            <span class="status-pill amber">人が確認</span>
           </div>
           <div id="tasks-content"></div>
         </section>
@@ -152,8 +154,8 @@
         <section class="view" id="view-creative" aria-labelledby="creative-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Creative</p>
-              <h2 id="creative-title">クリエイティブ</h2>
+              <p class="eyebrow">広告素材</p>
+              <h2 id="creative-title">広告素材</h2>
             </div>
             <button class="btn ghost" type="button" data-open-modal="creative">根拠を見る</button>
           </div>
@@ -163,10 +165,10 @@
         <section class="view" id="view-audit" aria-labelledby="audit-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Audit</p>
-              <h2 id="audit-title">監査</h2>
+              <p class="eyebrow">操作記録</p>
+              <h2 id="audit-title">記録</h2>
             </div>
-            <button class="btn ghost" type="button" id="verify-audit-button">hash chain verify</button>
+            <button class="btn ghost" type="button" id="verify-audit-button">記録を検証</button>
           </div>
           <div id="audit-content"></div>
         </section>
@@ -174,10 +176,10 @@
         <section class="view" id="view-settings" aria-labelledby="settings-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Connections</p>
+              <p class="eyebrow">連携と権限</p>
               <h2 id="settings-title">設定</h2>
             </div>
-            <span class="status-pill neutral">mock boundary</span>
+            <span class="status-pill neutral">テスト用</span>
           </div>
           <div id="settings-content"></div>
         </section>

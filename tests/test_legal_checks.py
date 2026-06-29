@@ -4,8 +4,8 @@ from app.legal_checks import run_rule_based_legal_check
 def test_legal_check_passes_safe_copy() -> None:
     result = run_rule_based_legal_check(
         texts=[
-            "Tact MVP Campaign",
-            "Target high-intent audiences and review performance before scaling.",
+            "はじめての広告案",
+            "反応を見ながら、成果の出た配信先へ予算を広げます。",
         ]
     )
 

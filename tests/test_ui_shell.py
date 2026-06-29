@@ -10,7 +10,7 @@ def test_ui_shell_is_served_from_root() -> None:
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Tact — Marketing Autonomy Engine" in response.text
+    assert "Tact — 広告運用アシスタント" in response.text
     assert "/static/" in response.text
     assert 'id="view-dashboard"' in response.text
     assert 'id="campaign-form"' in response.text
@@ -30,11 +30,11 @@ def test_ui_shell_exposes_seven_button_nav_items_without_anchor_onclick() -> Non
     assert "onclick=" not in js_response.text
     for label in (
         "ホーム",
-        "キャンペーン",
-        "ダッシュボード",
-        "タスク",
-        "クリエイティブ",
-        "監査",
+        "広告案",
+        "成果",
+        "確認待ち",
+        "広告素材",
+        "記録",
         "設定",
     ):
         assert label in js_response.text

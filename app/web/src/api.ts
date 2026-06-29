@@ -1,5 +1,6 @@
 import type {
   AuditEntry,
+  AuditVerificationResult,
   CampaignBrief,
   CampaignProposal,
   DevTokenResponse,
@@ -45,22 +46,22 @@ async function toUiError(response: Response): Promise<UiError> {
 }
 
 export function humanizeStatus(status: number, detail: string): string {
-  if (status === 401) return "認証が必要です。ロールを選び直して、期限付きトークンを取得してください。";
-  if (status === 403) return "この操作を実行する権限がありません。approver または admin に切り替えてください。";
-  if (status === 404) return "対象のキャンペーンまたはデータが見つかりません。";
+  if (status === 401) return "確認が必要です。権限を選び直して、もう一度お試しください。";
+  if (status === 403) return "この操作を実行する権限がありません。承認者または管理者に切り替えてください。";
+  if (status === 404) return "対象の広告案またはデータが見つかりません。";
   if (status === 409) return translateConflict(detail);
-  return `サーバーで問題が発生しました: ${detail}`;
+  return `システムで問題が発生しました: ${detail}`;
 }
 
 function translateConflict(detail: string): string {
   if (detail.includes("Measurement snapshot")) {
-    return "配信前に計測スナップショットが必要です。計測チェックを実行してください。";
+    return "広告を出す前に数字の確認結果が必要です。数字の確認を実行してください。";
   }
   if (detail.includes("Passed legal check")) {
-    return "配信前に法務チェックの pass が必要です。法務チェックを実行してください。";
+    return "広告を出す前に表現の確認が必要です。表現の確認を実行してください。";
   }
   if (detail.includes("pending approval")) {
-    return "このアクションは承認待ちではありません。最新状態を確認してください。";
+    return "この操作は確認待ちではありません。最新状態を確認してください。";
   }
   return `操作の前提条件が満たされていません: ${detail}`;
 }
@@ -105,7 +106,7 @@ export const api = {
   listAudit(campaignId: string): Promise<AuditEntry[]> {
     return requestJson<AuditEntry[]>(`/api/v1/campaigns/${campaignId}/audit`);
   },
-  verifyAudit(): Promise<unknown> {
-    return requestJson<unknown>("/api/v1/campaigns/audit/verify");
+  verifyAudit(): Promise<AuditVerificationResult> {
+    return requestJson<AuditVerificationResult>("/api/v1/campaigns/audit/verify");
   },
 };

@@ -7,19 +7,19 @@ LEGAL_RULES = [
         "rule_id": "yakkihou_medical_cure_claim",
         "severity": "block",
         "terms": ["治る", "完治", "治療", "薬いらず"],
-        "message": "Medical cure/treatment claims require legal review and are blocked.",
+        "message": "医療的な効果や治療を想起させる表現のため、公開前に確認が必要です。",
     },
     {
         "rule_id": "premium_representation_absolute_claim",
         "severity": "review",
         "terms": ["絶対", "必ず", "100%", "永久", "完全保証"],
-        "message": "Absolute performance claims need substantiation before publication.",
+        "message": "断定的な効果表現のため、公開前に根拠の確認が必要です。",
     },
     {
         "rule_id": "premium_representation_no1_claim",
         "severity": "review",
         "terms": ["No.1", "ナンバーワン", "業界一", "日本一"],
-        "message": "No.1/superiority claims require source evidence.",
+        "message": "最上級表現のため、公開前に根拠資料の確認が必要です。",
     },
 ]
 

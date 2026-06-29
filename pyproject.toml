@@ -1,7 +1,7 @@
 [project]
-name = "tact-cursor"
+name = "tact"
 version = "0.1.0"
-description = "MVP v3 server for Tact Cursor with mock media and LLM adapters."
+description = "MVP v3 server for Tact with mock media and LLM adapters."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

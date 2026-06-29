@@ -20,7 +20,7 @@ def test_kill_switch_latest_requires_evaluation() -> None:
     assert result["status"] == "clear"
     assert result["data_kind"] == "simulated"
     assert result["media_status"]["external_campaign_id"] is None
-    assert "no real stop action" in result["reason"]
+    assert "停止対象はありません" in result["reason"]
 
     latest_response = client.get(f"/api/v1/campaigns/{campaign_id}/kill-switch/latest")
 
@@ -50,7 +50,7 @@ def test_kill_switch_uses_mock_media_status_after_publish() -> None:
     assert result["data_kind"] == "simulated"
     assert result["media_status"]["external_campaign_id"] == external_campaign_id
     assert result["media_status"]["health"] == "healthy"
-    assert "no real stop mutation was executed" in result["reason"]
+    assert "実際の停止操作は行っていません" in result["reason"]
 
 
 def _create_campaign(client: TestClient) -> dict:

@@ -125,7 +125,7 @@ class CampaignService:
             actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=proposal.id,
-            summary="Campaign proposal created from server-side LLM and media planning.",
+            summary="広告案を作成しました。広告文と配信先の案はサーバー側で作成されています。",
             payload={
                 "brief": brief.model_dump(mode="json"),
                 "media_plan_request_id": media_plan.request_id,
@@ -139,8 +139,7 @@ class CampaignService:
                         "name": "server_generated_proposal",
                         "result": "passed",
                         "message": (
-                            "Creative, media plan, and audit entry were generated "
-                            "server-side."
+                            "広告文、配信先の案、操作記録をサーバー側で作成しました。"
                         ),
                     }
                 ],
@@ -206,7 +205,7 @@ class CampaignService:
             actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
-            summary="Publish action created as pending approval; no media mutation executed.",
+            summary="広告を出す前の最終確認に登録しました。まだ実際の広告操作は行っていません。",
             payload={"action_id": action.id, "action_kind": action.kind},
             diff={"status": {"from": previous_status, "to": campaign.status}},
             guardrail_result=action.guardrail_result,
@@ -250,7 +249,7 @@ class CampaignService:
             actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
-            summary="Pending publish action approved and submitted through the media adapter.",
+            summary="確認待ちだった広告開始を承認し、テスト用の媒体へ送信しました。",
             payload={
                 "action_id": action.id,
                 "external_campaign_id": publish_result.external_campaign_id,
@@ -285,7 +284,7 @@ class CampaignService:
             actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
-            summary="Pending publish action rejected; no media mutation executed.",
+            summary="確認待ちだった広告開始を差し戻しました。実際の広告操作は行っていません。",
             payload={"action_id": action.id},
             diff={"action": {"approval_status": {"from": "pending_approval", "to": "rejected"}}},
             guardrail_result=action.guardrail_result,
@@ -331,7 +330,7 @@ class CampaignService:
             actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
-            summary="Read-only GA4/Shopify measurement snapshot refreshed before publish.",
+            summary="広告を出す前に売上・アクセスの数字を確認しました。",
             payload={
                 "snapshot_id": snapshot.id,
                 "source": snapshot.source,
@@ -343,7 +342,7 @@ class CampaignService:
                     {
                         "name": "measurement_before_publish",
                         "result": "passed",
-                        "message": "Measurement snapshot exists before publish approval.",
+                        "message": "広告を出す前に数字の確認結果があります。",
                     }
                 ],
             },
@@ -383,7 +382,7 @@ class CampaignService:
             actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
-            summary="Rule-based legal check completed for campaign creative.",
+            summary="広告文の表現を確認しました。",
             payload={
                 "legal_check_id": result.id,
                 "status": result.status,
@@ -395,7 +394,7 @@ class CampaignService:
                     {
                         "name": "legal_check_before_publish",
                         "result": result.status,
-                        "message": "Rule-based 薬機法/景表法 check ran before publish.",
+                        "message": "広告を出す前に薬機法・景表法の簡易チェックを実行しました。",
                     }
                 ],
             },
@@ -424,7 +423,7 @@ class CampaignService:
             result = KillSwitchResult(
                 status="clear",
                 data_kind="simulated",
-                reason="No external campaign is published yet; no real stop action exists.",
+                reason="まだ広告を出していないため、停止対象はありません。",
                 media_status={"external_campaign_id": None, "active": False, "health": "unknown"},
             )
         else:
@@ -439,9 +438,9 @@ class CampaignService:
                 status="would_stop" if should_stop else "clear",
                 data_kind=media_status.data_kind,
                 reason=(
-                    "Mock media status is simulated; no real stop mutation was executed."
+                    "テスト用の媒体状態のため、実際の停止操作は行っていません。"
                     if media_status.data_kind == "simulated"
-                    else "Media status checked through adapter boundary."
+                    else "媒体の状態を確認しました。"
                 ),
                 media_status=media_status.model_dump(mode="json"),
             )
@@ -454,7 +453,7 @@ class CampaignService:
             actor=auth_context.actor_id,
             subject_type="campaign",
             subject_id=campaign.id,
-            summary="Kill Switch evaluated through media status boundary.",
+            summary="緊急停止の判定を実行しました。",
             payload={
                 "kill_switch_result_id": result.id,
                 "status": result.status,
@@ -511,7 +510,7 @@ class CampaignService:
             body=data["body"],
             call_to_action=data["call_to_action"],
             hashtags=[f"#{channel}" for channel in brief.channels],
-            compliance_notes=["Mock LLM output. Human review required before production use."],
+            compliance_notes=["テスト用の広告文です。公開前に人の確認が必要です。"],
         )
 
     def _find_pending_publish_action(self, campaign: CampaignProposal) -> AgentAction | None:
@@ -538,12 +537,12 @@ class CampaignService:
                 {
                     "name": "human_approval_required",
                     "result": "requires_approval",
-                    "message": "Publishing is a media mutation and requires human approval.",
+                    "message": "広告を出す操作は媒体側の変更になるため、人の確認が必要です。",
                 },
                 {
                     "name": "budget_positive",
                     "result": "passed",
-                    "message": f"Budget is {campaign.brief.total_budget_jpy} JPY.",
+                    "message": f"予算は {campaign.brief.total_budget_jpy} 円です。",
                 },
             ],
         }

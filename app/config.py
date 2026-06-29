@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = Field(default="local", alias="APP_ENV")
-    app_name: str = Field(default="Tact Cursor API", alias="APP_NAME")
+    app_name: str = Field(default="Tact API", alias="APP_NAME")
     media_adapter: AdapterKind = Field(default="mock", alias="MEDIA_ADAPTER")
     llm_adapter: AdapterKind = Field(default="mock", alias="LLM_ADAPTER")
     measurement_adapter: AdapterKind = Field(default="mock", alias="MEASUREMENT_ADAPTER")

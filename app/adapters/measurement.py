@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field
 
+from app.models.estimation import EstimateRange
 from app.models.measurement import MetricSnapshot
 
 
@@ -34,6 +35,9 @@ class MockMeasurementAdapter(MeasurementAdapter):
         orders = max(1, conversions - (seed % 3))
         revenue = orders * max(3000, request.total_budget_jpy // 20)
         ad_spend = max(1, min(request.total_budget_jpy, request.total_budget_jpy // 4))
+        cpa = round(ad_spend / conversions, 2)
+        roas = round(revenue / ad_spend, 2)
+        confidence = 0.62
         return MetricSnapshot(
             source="ga4_shopify_mock",
             data_kind="simulated",
@@ -42,9 +46,16 @@ class MockMeasurementAdapter(MeasurementAdapter):
             orders=orders,
             revenue_jpy=revenue,
             ad_spend_jpy=ad_spend,
-            cpa_jpy=round(ad_spend / conversions, 2),
-            roas=round(revenue / ad_spend, 2),
-            confidence=0.62,
+            cpa_jpy=cpa,
+            cpa_jpy_range=_estimate_range(cpa, uncertainty=0.18, confidence=confidence),
+            roas=roas,
+            roas_range=_estimate_range(roas, uncertainty=0.12, confidence=confidence),
+            conversions_range=_estimate_range(
+                conversions,
+                uncertainty=0.15,
+                confidence=confidence,
+            ),
+            confidence=confidence,
             labels={
                 "sessions": "simulated",
                 "conversions": "simulated",
@@ -55,3 +66,12 @@ class MockMeasurementAdapter(MeasurementAdapter):
                 "roas": "simulated",
             },
         )
+
+
+def _estimate_range(value: float, *, uncertainty: float, confidence: float) -> EstimateRange:
+    return EstimateRange(
+        low=round(value * (1 - uncertainty), 2),
+        high=round(value * (1 + uncertainty), 2),
+        confidence=confidence,
+        source="mock",
+    )

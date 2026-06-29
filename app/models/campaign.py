@@ -38,6 +38,7 @@ class CampaignBrief(BaseModel):
 
 
 class CreativeDraft(BaseModel):
+    source: Literal["mock", "model"] = "mock"
     headline: str
     body: str
     call_to_action: str

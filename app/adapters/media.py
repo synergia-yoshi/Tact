@@ -8,6 +8,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from app.models.estimation import EstimateRange
+
 
 class MediaPlacement(BaseModel):
     channel: str
@@ -31,9 +33,12 @@ class MediaPlanRequest(BaseModel):
 class MediaPlanResponse(BaseModel):
     request_id: str
     account_id: str
+    source: Literal["mock", "model"] = "mock"
     placements: list[MediaPlacement]
     estimated_reach: int
+    estimated_reach_range: EstimateRange | None = None
     estimated_cpa_jpy: int
+    estimated_cpa_jpy_range: EstimateRange | None = None
     generated_at: datetime
 
 
@@ -129,12 +134,26 @@ class MockMediaAdapter(MediaAdapter):
                 )
             )
 
+        estimated_reach = max(1000, request.total_budget_jpy * 3)
+        estimated_cpa = max(100, request.total_budget_jpy // 120)
+        channel_uncertainty = min(0.28, 0.16 + (0.02 * max(0, len(channels) - 1)))
+
         return MediaPlanResponse(
             request_id=f"media_plan_mock_{uuid4().hex}",
             account_id=request.account_id,
             placements=placements,
-            estimated_reach=max(1000, request.total_budget_jpy * 3),
-            estimated_cpa_jpy=max(100, request.total_budget_jpy // 120),
+            estimated_reach=estimated_reach,
+            estimated_reach_range=_estimate_range(
+                estimated_reach,
+                uncertainty=channel_uncertainty,
+                confidence=0.58,
+            ),
+            estimated_cpa_jpy=estimated_cpa,
+            estimated_cpa_jpy_range=_estimate_range(
+                estimated_cpa,
+                uncertainty=channel_uncertainty + 0.04,
+                confidence=0.54,
+            ),
             generated_at=datetime.now(tz=UTC),
         )
 
@@ -177,3 +196,12 @@ class MockMediaAdapter(MediaAdapter):
             data_kind="simulated",
             checked_at=datetime.now(tz=UTC),
         )
+
+
+def _estimate_range(value: float, *, uncertainty: float, confidence: float) -> EstimateRange:
+    return EstimateRange(
+        low=round(value * (1 - uncertainty), 2),
+        high=round(value * (1 + uncertainty), 2),
+        confidence=confidence,
+        source="mock",
+    )

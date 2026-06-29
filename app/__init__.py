@@ -1,1 +1,1 @@
-"""Tact Cursor server package."""
+"""Tact server package."""

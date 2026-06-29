@@ -64,15 +64,15 @@ class MockLLMAdapter(LLMAdapter):
 
         content = json.dumps(
             {
-                "headline": "Tact MVP Campaign",
+                "headline": "はじめての広告案",
                 "body": (
-                    "Target the highest-intent audience first, validate the message with "
-                    "small budget allocations, then expand the winning channel mix."
+                    "まずは購入や問い合わせにつながりやすいお客様に絞って、"
+                    "少額から反応を確認します。成果が見えた配信先へ予算を広げます。"
                 ),
-                "call_to_action": "Start with a focused test campaign",
+                "call_to_action": "少額で試してみる",
                 "mock_trace_id": digest,
             },
-            ensure_ascii=True,
+            ensure_ascii=False,
         )
 
         prompt_tokens = max(1, len(payload.split()))
