@@ -135,6 +135,18 @@ def test_publish_requires_approval_then_fetches_performance() -> None:
 
     publish_response = client.post(f"/api/v1/campaigns/{campaign_id}/publish")
 
+    assert publish_response.status_code == 409
+    assert publish_response.json()["detail"] == (
+        "Passed legal check required before publish approval can be requested"
+    )
+
+    legal_response = client.post(f"/api/v1/campaigns/{campaign_id}/legal-checks/run")
+
+    assert legal_response.status_code == 200
+    assert legal_response.json()["status"] == "passed"
+
+    publish_response = client.post(f"/api/v1/campaigns/{campaign_id}/publish")
+
     assert publish_response.status_code == 200
     pending = publish_response.json()
     assert pending["status"] == "draft"
@@ -181,6 +193,7 @@ def test_publish_requires_approval_then_fetches_performance() -> None:
     assert [entry["event_type"] for entry in audit_response.json()] == [
         "campaign.proposal.created",
         "campaign.measurement.refreshed",
+        "campaign.legal_check.completed",
         "campaign.publish.requested",
         "campaign.publish.approved",
     ]

@@ -36,12 +36,16 @@ python3 -m ruff check .
 - `GET /api/v1/campaigns` - list stored campaign proposals.
 - `GET /api/v1/campaigns/{campaign_id}` - fetch a campaign proposal.
 - `POST /api/v1/campaigns/{campaign_id}/publish` - create a server-side
-  `pending_approval` publish action after a measurement snapshot exists; no
+  `pending_approval` publish action after measurement and legal checks pass; no
   media mutation happens yet.
 - `POST /api/v1/campaigns/{campaign_id}/measurements/refresh` - fetch a
   read-only GA4/Shopify-shaped measurement snapshot.
 - `GET /api/v1/campaigns/{campaign_id}/measurements/latest` - return the latest
   measurement snapshot for the campaign.
+- `POST /api/v1/campaigns/{campaign_id}/legal-checks/run` - run rule-based
+  薬機法/景表法 copy checks.
+- `GET /api/v1/campaigns/{campaign_id}/legal-checks/latest` - return the latest
+  legal check result.
 - `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/approve` - approve
   and submit a pending publish action to the mock media API.
 - `POST /api/v1/campaigns/{campaign_id}/actions/{action_id}/reject` - reject a
@@ -81,6 +85,8 @@ Example proposal request:
   reference resolution boundaries.
 - Milestone 6: measurement-first read model that requires a GA4/Shopify-shaped
   snapshot before publish approval can be requested.
+- Milestone 7: rule-based legal-check API that must pass before publish
+  approval can be requested.
 
 ## Persistence and secrets
 
@@ -155,6 +161,7 @@ tenant headers such as `x-tact-org`.
   client-supplied tenant headers.
 - [x] Publish approval requests require a read-only measurement snapshot first.
 - [x] Metric snapshots label values as simulated/measured and carry confidence.
+- [x] Publish approval requests require a passed rule-based legal check first.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions
