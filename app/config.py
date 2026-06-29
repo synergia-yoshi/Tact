@@ -5,6 +5,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AdapterKind = Literal["mock", "real"]
+StorageBackend = Literal["memory", "firestore"]
 
 
 class Settings(BaseSettings):
@@ -16,9 +17,17 @@ class Settings(BaseSettings):
     app_name: str = Field(default="Tact Cursor API", alias="APP_NAME")
     media_adapter: AdapterKind = Field(default="mock", alias="MEDIA_ADAPTER")
     llm_adapter: AdapterKind = Field(default="mock", alias="LLM_ADAPTER")
+    storage_backend: StorageBackend = Field(default="memory", alias="STORAGE_BACKEND")
 
     mock_media_account_id: str = Field(default="mock-account-001", alias="MOCK_MEDIA_ACCOUNT_ID")
     mock_llm_model: str = Field(default="tact-mock-v3", alias="MOCK_LLM_MODEL")
+
+    gcp_project_id: str | None = Field(default=None, alias="GCP_PROJECT_ID")
+    firestore_database: str | None = Field(default=None, alias="FIRESTORE_DATABASE")
+    firestore_collection_prefix: str = Field(
+        default="tact_mvp_v3",
+        alias="FIRESTORE_COLLECTION_PREFIX",
+    )
 
     media_api_base_url: str | None = Field(default=None, alias="MEDIA_API_BASE_URL")
     media_api_key: str | None = Field(default=None, alias="MEDIA_API_KEY")
@@ -32,6 +41,7 @@ class Settings(BaseSettings):
             "environment": self.app_env,
             "media_adapter": self.media_adapter,
             "llm_adapter": self.llm_adapter,
+            "storage_backend": self.storage_backend,
         }
 
 

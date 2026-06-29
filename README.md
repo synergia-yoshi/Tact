@@ -72,6 +72,40 @@ Example proposal request:
   adapter boundary intended for real media API replacement.
 - Milestone 4: server-generated append-only audit ledger with hash-chain
   verification and human approval gating before publish mutation.
+- Milestone 5: storage backend switch for Firestore plus Secret Manager
+  reference resolution boundaries.
+
+## Persistence and secrets
+
+Default local storage is in-memory:
+
+```txt
+STORAGE_BACKEND=memory
+```
+
+Server deployments can switch to Firestore after installing the optional GCP
+dependencies:
+
+```bash
+python3 -m pip install -e ".[gcp]"
+```
+
+```txt
+STORAGE_BACKEND=firestore
+GCP_PROJECT_ID=<project-id>
+FIRESTORE_DATABASE=(default)
+FIRESTORE_COLLECTION_PREFIX=tact_mvp_v3
+```
+
+Secret values must stay in the runtime environment or Secret Manager. Secret
+Manager references use:
+
+```txt
+MEDIA_API_KEY=sm://projects/<project-id>/secrets/<secret-name>/versions/latest
+```
+
+The health endpoint exposes only adapter/storage kinds, never raw secret values
+or secret reference names.
 
 ## Acceptance checklist
 
@@ -88,6 +122,8 @@ Example proposal request:
   mutation.
 - [x] Audit entries are generated only on the server and verified through a
   hash chain.
+- [x] Firestore and Secret Manager are behind server-side adapter boundaries and
+  are not required for local tests.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions
