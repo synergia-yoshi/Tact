@@ -2,228 +2,138 @@
 
 ## 1. Target SSoT
 
-Current implementation target is `synergia-yoshi/Tact`. Local repo path remains
-`C:\dev\repos\cursor` because the old repo name redirects.
+Repo: `synergia-yoshi/Tact`
+Local path: `C:\dev\repos\Tact`
+Branch: `codex/ms4-rich-dashboard`
+Base: `origin/codex/ms3-generation-experience` / PR #13
+Draft PR: `https://github.com/synergia-yoshi/Tact/pull/14`
 
-Current local branch is `codex/ms3-generation-experience`, created as a
-follow-up branch on top of PR #12 commit `5e901f8` plus the MS2.5 polish pass.
-PR #12 itself should remain the MS2 Vite vertical slice; MS2.5/MS3 should be
-reviewed as follow-up PRs.
+MS4 implements the rich dashboard brief from
+`2026-06-30-Codex-MS4-rich-dashboard.md`. Runtime truth remains the FastAPI
+backend: the UI renders dashboard API responses and never fabricates measured
+values, trend lines, Kill Switch state, or audit history.
 
-Draft PR for this follow-up work:
-`https://github.com/synergia-yoshi/Tact/pull/13`
-
-Visual SSoT is `design-reference.html` at the repository root. It remains
-read-only reference material.
-
-Runtime SSoT remains the FastAPI backend. The UI does not invent authoritative
-campaign state, forecast ranges, confidence, approval state, audit status, or
-generation completion. It calls reviewed API endpoints and renders server
-responses or explicit in-flight API phases.
+Visual SSoT remains `design-reference.html`; the implemented app continues the
+blue-token direction and avoids purple gradients in charts and app chrome.
 
 ## 2. What Changed
 
-- Preserved the Vite + TypeScript seven-nav UI from PR #12 and the MS2.5 polish
-  pass.
-- Added `source` to `EstimateRange`, `MediaPlanResponse`, and `CreativeDraft`.
-- UI labels now distinguish mock/model/measured origins:
-  - `mock` -> `テスト用の数字` or `テスト用の案`
-  - `model` -> `自動推定` or `自動作成`
-  - `measured` -> `実データ`
-- Replaced remaining over-strong generation labels so mock creative/media output
-  is not presented as production server/model output.
-- Added an SMB-friendly copy pass for low marketing/IT literacy users:
-  visible UI now avoids English/internal terms such as `operator`,
-  `signed_bearer`, `D2C`, `BtoB SaaS`, `Feed`, `ROAS`, and `OK` where a plain
-  Japanese label is clearer.
-- Continued the copy pass after in-browser review:
-  `配信前チェック` -> `出す前の確認`, `信頼度` -> `確かさ`,
-  `獲得単価` -> `1件あたりの費用`, and `テスト表示` -> `テスト用`.
-- Reverted the experimental home hero copy after owner feedback; the hero is
-  back to `広告づくりを、3問から。出す前の確認まで、ひとつずつ進めます。`.
-- Reverted the app chrome visual treatment toward the review's SSoT direction:
-  removed `--grad` from the app CSS, replaced purple/blue gradients on primary
-  buttons, role switcher, logo/avatar, and mock banner with blue solid or
-  neutral/amber surfaces, and removed purple hardcoded shadows.
-- Local mock creative output is now Japanese, visible channel keys render as
-  `検索広告` / `SNS広告` / `バナー広告`, and audit UI hides raw campaign/org/hash
-  IDs behind plain operation summaries.
-- Added a generation stepper:
-  1. 宣伝内容の入力
-  2. 出し先と予算の案
-  3. 広告文の案
-  4. 出す前の確認
-  5. 最終確認
-- Step statuses are derived from server responses, current API calls, or the
-  last failed operation: 未着手 / 現在 / 進行中 / 完了 / 失敗.
-- Added an honest progress panel in Creative. It shows only real events:
-  proposal API response, media adapter response, LLM adapter response,
-  measurement refresh, legal check, and publish approval request.
-- Gate execution now updates loading phases for the actual API sequence:
-  measurement -> legal -> publish request.
-- Added "入力に戻る" and "別案を作る" controls. They do not mutate server
-  state; retry only restores the prior brief into the form so a new proposal can
-  be requested.
-- MS3.5 product refinements implemented:
-  - Monthly budget slider now supports `¥100,000` to `¥5,000,000` in
-    `¥100,000` steps while preserving `total_budget_jpy = value * 10000`.
-  - The `efficiency` objective label is now `費用対効果を最大化`; the backend key
-    remains `efficiency`.
-  - Automation choice UI is now two options: `おまかせ` (`approval_only`) and
-    `一緒に` (`guided`). Legacy `full_auto` can still exist in the enum/API but
-    is not exposed in the UI; retrying an old `full_auto` campaign falls back to
-    `approval_only`.
-  - The rule `広告を出す前・予算変更は必ず人が確認` is shown as a fixed policy note,
-    not as one selectable mode.
-  - Settings now includes a `データ連携` section for GA4, Shopify, and Google広告.
-    Current dev/mock rows are labeled `テスト用`, connection buttons are
-    admin-only, and no API key input/storage/display was added.
-  - The data-integration catalog now includes `準備中` entries for major
-    measurement, EC/payment, ad, and customer-contact services. The catalog is
-    grouped into 計測・解析 / ネットショップ・決済 / 広告媒体 / 顧客・連絡 with
-    18 total rows: 3 `テスト用` rows and 15 `準備中` rows. Coming-soon rows do
-    not expose connection buttons.
-- Rebuilt committed FastAPI-served assets in `app/web/dist`.
-- Existing MS2.5 behavior remains:
-  loading/disabled/double-submit guards, partial rendering, stable Chart.js,
-  no fabricated trend line, formatted audit verify, local-only role switcher,
-  assertive toast, and modal focus restore.
+- Added dashboard read models in `app/models/dashboard.py`:
+  KPI metrics, channel rows, improvement-cycle history, and server-derived
+  Kill Switch state.
+- Added `MetricSeriesPoint` and `MetricSnapshot.series` so time-series points
+  are explicitly supplied by the backend, including `value = null` gaps.
+- Extended the mock measurement adapter to return source-labeled test series
+  with an intentional gap. The UI shows gaps as `データなし` and does not
+  interpolate.
+- Added `GET /api/v1/campaigns/{campaign_id}/dashboard` with period and channel
+  filters. KPI totals and channel rows are calculated server-side from
+  `media_plan` plus the latest `MetricSnapshot`.
+- Added `POST /api/v1/campaigns/{campaign_id}/kill-switch/stop-simulation`.
+  It is role-gated to approver/admin, records hash-chain audit, and states that
+  test media performs no real stop.
+- Kept `kill-switch/evaluate` as a status check; destructive-like stop intent is
+  separate and audited.
+- Updated Dashboard UI:
+  KPI summary band, period/channel segmented filters, source labels on every
+  numeric value, Chart.js line only when series is supplied, current/empty state
+  otherwise, channel rows with source-labeled metrics and gap-respecting
+  sparklines, improvement-loop timeline, and Kill Switch controls.
+- Added chart alternative text and a compact data table for the chart source
+  data.
+- Preserved partial rendering: role switching updates Kill buttons without
+  recreating an unchanged chart canvas.
+- Updated audit formatting for `campaign.kill_switch.stop_requested`.
+- Rebuilt committed Vite assets in `app/web/dist`.
 
 ## 3. Current State
 
-- Working:
-  - `/` serves `app/web/dist/index.html`.
-  - `/static/main.js` and `/static/index.css` serve built Vite assets.
-  - Proposal creation displays a stepper and shows real in-flight API state.
-  - Creative/media plan output carries explicit test-use source labels.
-  - Publish gate progress is tied to actual API calls, not fake progress bars or
-    timers.
-  - Pending approval is still server-created and role-gated.
-  - Operator can create proposals and request publish approval.
-  - Operator cannot approve publish; approver/admin can.
-  - Dashboard shows only current metric data, with `実データ` / `テスト用` labels and
-    no implied improvement history.
-  - Audit view reads campaign audit entries; verify remains admin-only and is
-    rendered as formatted continuity status.
-  - App chrome no longer uses the blue-to-purple `--grad`; primary actions,
-    logo/avatar, active role controls, and loop badges use SSoT blue tokens.
-    The mock creative banner is neutral/amber so test output is not promoted as
-    the main brand surface.
-  - 401/403/404/409 are translated into Japanese UI messages.
-  - Browser copy check on `http://127.0.0.1:8012/` found no visible English
-    tokens in generated creative or audit views except the brand/common `Tact`
-    / `SNS`.
-  - Budget creation at `¥5,000,000` is covered by E2E and media placement
-    budget allocation sums exactly to the submitted total.
-  - Settings shows GA4 / Shopify / Google広告 as `テスト用`; non-admin connection
-    buttons are disabled, admin sees the connection path, and the UI does not
-    display `接続済み` for mock/test integrations.
-  - Settings also shows the expanded coming-soon catalog without implying
-    availability: Search Console, Metaピクセル, BASE, STORES, 楽天市場, Amazon,
-    Stripe, Yahoo!広告, Meta広告, X広告, TikTok広告, LINE広告, Microsoft広告,
-    LINE公式アカウント, and Mailchimp are visible as `準備中`.
-- Still mock/simulated:
-  - GA4/Shopify read model is the existing mock adapter.
-  - The new Settings data-integration rows are status/UX only; real OAuth and
-    backend connection state are future work.
-  - LLM creative output is the mock LLM adapter.
-  - Media planning/publish is mock media.
-  - Kill Switch text states simulation/no real stop.
-  - Role token minting is local-only and not a production issuer.
-- Not yet complete:
-  - Rich Dashboard with improvement-loop history, media delivery status, and
-    Kill Switch API wiring is still MS4.
-  - Customer/operator screen separation remains a later milestone.
-  - Real GA4/Shopify, Google Ads OAuth, Firestore transaction immutability, and
-    legal dictionary hardening remain separate backend work.
+Working:
+
+- Dashboard shows KPI summary, media/channel status, improvement-loop history,
+  and Kill Switch in one screen.
+- Empty/unmeasured state is honest: no metric value and no chart line is shown
+  before measurement.
+- All displayed numeric values carry a source label (`テスト用`, `実データ`, or
+  pending state). Mock values are labeled `テスト用`.
+- Time-series lines render only from supplied `MetricSnapshot.series`; missing
+  points remain `データなし`.
+- Period and channel filters call the dashboard API and change server-side
+  aggregation.
+- Channel rows include planned budget, spend, ROAS, CPA, conversions, source
+  labels, and sparklines only when series is present.
+- Kill Switch state is server-derived. `止める想定` is disabled for operator and
+  enabled for approver/admin; successful operation appends audit.
+- Audit view formats the new Kill event without exposing raw JSON.
+- Mobile 390x844 E2E verifies no document-level horizontal overflow on the rich
+  dashboard path.
+
+Still simulated/mock:
+
+- Measurement is the GA4/Shopify mock adapter.
+- Media planning, publish, delivery status, and stop intent are mock/test media.
+- Kill Switch stop is simulation only; no real media stop API is connected.
+- Real OAuth and production role/session separation remain later work.
 
 ## 4. Validation
 
-- `npm run test` passed:
-  - TypeScript typecheck
-  - Vitest XSS escaping unit test
-- `npm run test:e2e` passed:
-  - proposal -> stepper/source labels -> gate -> pending approval -> operator
-    denied -> approver approval -> dashboard
-  - chart canvas remains stable across role switching
-  - audit verify is admin-only and formatted
-  - proposal submit is disabled while the request is in flight
-  - MS3.5 budget upper bound, two automation choices, old copy removal, and
-    settings data-integration state are covered
-  - Expanded data-integration catalog coverage checks 18 rows, 15 `準備中`
-    statuses, 3 connection buttons, and no visible `接続済み` for mock/test rows
-- `npm run build` passed as part of `npm run test:e2e` and refreshed
-  `app/web/dist`.
-- `.\.venv312\Scripts\python.exe -m pytest` passed: 38 tests.
+- `.\.venv312\Scripts\python.exe -m pytest -q` passed: 41 tests.
 - `.\.venv312\Scripts\python.exe -m ruff check .` passed.
+- `npm run test` passed:
+  TypeScript typecheck and Vitest.
+- `npm run test:e2e` passed: 4 Playwright tests.
+  Coverage includes proposal -> gate -> approval -> rich dashboard, empty
+  dashboard state, media filtering, supplied time-series/gap display, Kill role
+  control, Kill audit entry, chart stability across role switching, settings,
+  and mobile no-horizontal-overflow.
+- `npm run build` passed as part of E2E and refreshed `app/web/dist`.
 - `git diff --check` passed.
-- Post-build headless UI copy smoke passed across home, creative, tasks, and
-  dashboard: no visible `配信前チェック` / `信頼度` / `テスト表示` /
-  `配信済み` / `獲得単価` regressions.
-- Hero revert smoke passed on `http://127.0.0.1:8012/`: original
-  `3問で開始` / `広告づくりを、3問から。` hero visible again and the experimental
-  `マーケの作業を、AIで下書き。` headline absent.
-- MS3.5 browser smoke passed on `http://127.0.0.1:8012/`:
-  home budget attributes are `min=10 max=500 step=10`, old goal/automation copy
-  is absent, settings integration rows are `テスト用`, admin-only connection path
-  shows a server-side OAuth/API-key warning, and a 390x844 mobile viewport has
-  no horizontal overflow on the changed home/settings areas.
-- MS3.5 catalog smoke passed via local Playwright against
-  `http://127.0.0.1:8012/`: desktop has 4 groups / 18 rows / `test=3` /
-  `coming_soon=15` / 3 connect buttons / no visible `接続済み`; mobile 390x844
-  has no horizontal overflow.
-- Visual SSoT smoke passed:
-  - `rg` found no `--grad`, `#5b4ff0`, `#6d5cf5`, `rgba(76, 72, 210, ...)`, or
-    `rgba(109, 92, 245, ...)` in `app/web/src/styles.css` or `app/web/dist`.
-  - Playwright computed styles confirmed app primary buttons, logo/avatar, and
-    active role controls are blue solid with no background image on desktop and
-    mobile; allocation bars use the approved blue-only gradient; mock banner is
-    amber/neutral.
-- Known warning: FastAPI/Starlette TestClient emits the existing `httpx2`
-  deprecation warning; no failure.
+
+Known warning: FastAPI/Starlette TestClient emits the existing `httpx2`
+deprecation warning only.
 
 ## 5. Assumptions Made
 
-- PR #13 is the active draft follow-up PR for this branch.
-- The experimental hero copy was reverted after owner feedback; future
-  copy/voice changes should stay proposal-only unless explicitly approved.
-- The MS3.5 §5 copy/voice proposal was intentionally not implemented; only
-  §1-§4 were treated as approved implementation work.
-- Existing APIs are enough for MS3's honest generation experience. Because
-  `createProposal` does not stream intermediate events, media plan and creative
-  draft are marked complete only when the server response arrives.
-- Loading phase changes during gate execution are acceptable because they are
-  tied one-to-one to actual API calls.
-- Test-use source labels are mandatory while the adapters remain mock-backed.
-- Committing `app/web/dist` remains acceptable because FastAPI serves built
-  static assets directly.
+- PR split is fixed as:
+  - #12: MS2 Vite vertical slice
+  - #13: MS2.5-MS3.5 UI/generation experience
+  - #14: MS4 rich dashboard
+- MS4 stacks on PR #13 via branch `codex/ms4-rich-dashboard`.
+- Mock channel-level metrics are acceptable because they are server-generated,
+  deterministic, and labeled `テスト用`.
+- `app/web/dist` remains committed because FastAPI serves built assets directly.
+- §5 brand/appeal copy remains on hold; only plain existing-tone operational
+  labels were added.
 
 ## 6. Next Work
 
-1. Decide how to split PRs:
-   - PR #12: MS2 Vite vertical slice
-   - follow-up: MS2.5 polish
-   - follow-up: MS3 generation experience
-2. Resolve the remaining process/design question: `design-reference.html`
-   contains both an early blue-solid token set and later demo CSS that re-adds
-   `--grad`; this pass followed the explicit review direction to use the
-   blue-solid SSoT tokens for app chrome.
-3. Expand Dashboard with improvement-loop history, media delivery status, and
-   Kill Switch API wiring while keeping mock status explicit.
-4. Split customer-facing read views from operator controls by role.
-5. Continue backend hardening separately:
-   Firestore append-only transactions, legal normalization/severity review,
-   real GA4/Shopify read adapters, Google Ads OAuth, and scoped real stop/pause.
-6. Review the MS3.5 §5 copy/voice proposal separately before any broader copy
-   rewrite.
+1. Add real channel-dimension measurement when the measurement adapter supports
+   it; keep the same dashboard contract.
+2. Connect real delivery stop/pause APIs only after scoped backend design and
+   approval workflow are approved.
+3. Split customer-facing read views from operator controls by role.
+4. Continue backend hardening separately: Firestore append-only transactions,
+   legal dictionary hardening, real GA4/Shopify adapters, Google Ads OAuth, and
+   production auth/session issuer.
 
 ## 7. Awaiting Approval / Decisions
 
-- Whether built `app/web/dist` should stay committed long-term or be produced by
-  CI before Python packaging/deploy.
-- Whether PR #13 should stay stacked on PR #12 until PR #12 lands, or be retargeted
-  after the base branch is merged.
-- Production auth/token issuer and session UX.
-- Whether to introduce React before the UI grows beyond the lightweight
-  TypeScript store/router layer.
-- Customer-facing copy for role-separated screens.
+- Real media stop scope and approval workflow.
+- Whether the dashboard endpoint should become a broader reporting API once
+  real integrations land.
+- Long-term policy for committing `app/web/dist`.
+- Production auth/session design.
+
+## PR Acceptance Checklist
+
+- [x] KPI summary band, media status, improvement loop, and Kill Switch are
+  present and stable in empty states.
+- [x] All numeric values have source labels or an explicit pending state.
+- [x] No fake measured values or fake trend lines are shown without backend
+  supply.
+- [x] Time-series line appears only when supplied; gaps are not interpolated.
+- [x] Kill Switch stop intent is approver/admin-only and audited.
+- [x] Chart uses blue tokens, has alternative text/data table, and remains
+  stable across role switching.
+- [x] Mobile dashboard path has no document-level horizontal overflow.
+- [x] pytest, ruff, npm test, E2E, build, and diff check pass.

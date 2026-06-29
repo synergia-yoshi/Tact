@@ -154,6 +154,46 @@ def test_audit_verify_requires_admin_role(signed_auth_env: None) -> None:
     assert allowed_response.json()["valid"] is True
 
 
+def test_kill_switch_stop_requires_approver_or_admin(signed_auth_env: None) -> None:
+    client = TestClient(create_app())
+    operator_headers = _headers(actor_id="operator", org_id="org-a", roles=["operator"])
+    approver_headers = _headers(actor_id="approver", org_id="org-a", roles=["approver"])
+    campaign = _create_ready_to_publish_campaign(client, operator_headers)
+    action = campaign["actions"][0]
+    approve_response = client.post(
+        f"/api/v1/campaigns/{campaign['id']}/actions/{action['id']}/approve",
+        headers=approver_headers,
+    )
+    assert approve_response.status_code == 200
+
+    denied_response = client.post(
+        f"/api/v1/campaigns/{campaign['id']}/kill-switch/stop-simulation",
+        headers=operator_headers,
+    )
+
+    assert denied_response.status_code == 403
+
+    allowed_response = client.post(
+        f"/api/v1/campaigns/{campaign['id']}/kill-switch/stop-simulation",
+        headers=approver_headers,
+    )
+
+    assert allowed_response.status_code == 200
+    result = allowed_response.json()
+    assert result["status"] == "would_stop"
+    assert result["data_kind"] == "simulated"
+    assert "実際の広告停止操作は行っていません" in result["reason"]
+
+    audit_response = client.get(
+        f"/api/v1/campaigns/{campaign['id']}/audit",
+        headers=approver_headers,
+    )
+
+    assert audit_response.status_code == 200
+    assert audit_response.json()[-1]["event_type"] == "campaign.kill_switch.stop_requested"
+    assert audit_response.json()[-1]["hash"]
+
+
 def test_local_dev_token_can_be_used_for_signed_bearer_auth(
     signed_auth_env: None,
 ) -> None:

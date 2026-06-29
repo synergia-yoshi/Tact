@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, Field
 
 from app.models.estimation import EstimateRange
-from app.models.measurement import MetricSnapshot
+from app.models.measurement import MetricSeriesPoint, MetricSnapshot
 
 
 class MeasurementReadRequest(BaseModel):
@@ -38,6 +39,7 @@ class MockMeasurementAdapter(MeasurementAdapter):
         cpa = round(ad_spend / conversions, 2)
         roas = round(revenue / ad_spend, 2)
         confidence = 0.62
+        measured_at = datetime.now(tz=UTC)
         return MetricSnapshot(
             source="ga4_shopify_mock",
             data_kind="simulated",
@@ -65,6 +67,15 @@ class MockMeasurementAdapter(MeasurementAdapter):
                 "cpa_jpy": "simulated",
                 "roas": "simulated",
             },
+            series={
+                "conversions": _mock_series(
+                    measured_at=measured_at,
+                    total=conversions,
+                    points=8,
+                    gap_index=3,
+                )
+            },
+            measured_at=measured_at,
         )
 
 
@@ -75,3 +86,32 @@ def _estimate_range(value: float, *, uncertainty: float, confidence: float) -> E
         confidence=confidence,
         source="mock",
     )
+
+
+def _mock_series(
+    *,
+    measured_at: datetime,
+    total: int,
+    points: int,
+    gap_index: int,
+) -> list[MetricSeriesPoint]:
+    daily_base = max(1, total // max(1, points - 1))
+    series: list[MetricSeriesPoint] = []
+    for index in range(points):
+        timestamp = measured_at - timedelta(days=points - 1 - index)
+        value: float | None
+        if index == gap_index:
+            value = None
+        else:
+            value = max(1, daily_base + ((index % 3) - 1))
+        series.append(
+            MetricSeriesPoint(
+                timestamp=timestamp,
+                value=value,
+                data_kind="simulated",
+                source="ga4_shopify_mock",
+                low=None if value is None else round(value * 0.86, 2),
+                high=None if value is None else round(value * 1.14, 2),
+            )
+        )
+    return series

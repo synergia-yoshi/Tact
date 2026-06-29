@@ -2,8 +2,12 @@ import type {
   AuditEntry,
   AuditVerificationResult,
   CampaignBrief,
+  CampaignDashboard,
   CampaignProposal,
+  DashboardChannelFilter,
+  DashboardPeriod,
   DevTokenResponse,
+  KillSwitchResult,
   MetricSnapshot,
   Role,
   UiError,
@@ -82,6 +86,16 @@ export const api = {
       body: JSON.stringify(brief),
     });
   },
+  getDashboard(
+    campaignId: string,
+    period: DashboardPeriod,
+    channel: DashboardChannelFilter,
+  ): Promise<CampaignDashboard> {
+    const params = new URLSearchParams({ period, channel });
+    return requestJson<CampaignDashboard>(
+      `/api/v1/campaigns/${campaignId}/dashboard?${params.toString()}`,
+    );
+  },
   refreshMeasurements(campaignId: string): Promise<MetricSnapshot> {
     return requestJson<MetricSnapshot>(`/api/v1/campaigns/${campaignId}/measurements/refresh`, {
       method: "POST",
@@ -100,6 +114,18 @@ export const api = {
   approveAction(campaignId: string, actionId: string): Promise<CampaignProposal> {
     return requestJson<CampaignProposal>(
       `/api/v1/campaigns/${campaignId}/actions/${actionId}/approve`,
+      { method: "POST" },
+    );
+  },
+  evaluateKillSwitch(campaignId: string): Promise<KillSwitchResult> {
+    return requestJson<KillSwitchResult>(
+      `/api/v1/campaigns/${campaignId}/kill-switch/evaluate`,
+      { method: "POST" },
+    );
+  },
+  requestKillSwitchStop(campaignId: string): Promise<KillSwitchResult> {
+    return requestJson<KillSwitchResult>(
+      `/api/v1/campaigns/${campaignId}/kill-switch/stop-simulation`,
       { method: "POST" },
     );
   },

@@ -7,6 +7,7 @@ from app.auth import AuthContext, get_auth_context
 from app.dependencies import get_campaign_service
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import CampaignBrief, CampaignProposal
+from app.models.dashboard import CampaignDashboard, DashboardChannelFilter, DashboardPeriod
 from app.models.kill_switch import KillSwitchResult
 from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
@@ -64,6 +65,28 @@ async def get_campaign(
 ) -> CampaignProposal:
     try:
         return service.get_campaign(campaign_id, auth_context)
+    except CampaignNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        ) from error
+
+
+@router.get("/{campaign_id}/dashboard", response_model=CampaignDashboard)
+async def get_campaign_dashboard(
+    campaign_id: str,
+    service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+    period: DashboardPeriod = "28d",
+    channel: DashboardChannelFilter = "all",
+) -> CampaignDashboard:
+    try:
+        return service.get_dashboard(
+            campaign_id,
+            auth_context,
+            period=period,
+            channel_filter=channel,
+        )
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -176,6 +199,23 @@ async def evaluate_campaign_kill_switch(
 ) -> KillSwitchResult:
     try:
         return await service.evaluate_kill_switch(campaign_id, auth_context)
+    except CampaignNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        ) from error
+    except PolicyViolationError as error:
+        raise _policy_violation(error) from error
+
+
+@router.post("/{campaign_id}/kill-switch/stop-simulation", response_model=KillSwitchResult)
+async def request_campaign_kill_switch_stop(
+    campaign_id: str,
+    service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+) -> KillSwitchResult:
+    try:
+        return await service.request_kill_switch_stop(campaign_id, auth_context)
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

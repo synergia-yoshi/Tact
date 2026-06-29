@@ -12,9 +12,16 @@ import {
 import type {
   AgentAction,
   AutonomyLevel,
+  CampaignDashboard,
   CampaignBrief,
   CampaignProposal,
+  ChannelDashboardRow,
+  DashboardChannelFilter,
+  DashboardMetric,
+  DashboardPeriod,
   EstimateRange,
+  ImprovementCycle,
+  MetricSeriesPoint,
   LegalCheckResult,
   MetricSnapshot,
   Role,
@@ -37,6 +44,7 @@ let chart: Chart | null = null;
 let chartSignature: string | null = null;
 let lastFocusedBeforeModal: HTMLElement | null = null;
 const viewSignatures = new Map<string, string>();
+const dashboardFilterStorageKey = "tact-dashboard-filters";
 
 type DataIntegrationStatus = "unconnected" | "connected" | "test" | "error" | "coming_soon";
 
@@ -205,6 +213,7 @@ function renderNav(): void {
 function setRoute(route: RouteName): void {
   setState({ route, error: null });
   if (route === "audit") void loadAudit();
+  if (route === "dashboard") void loadDashboard();
 }
 
 function render(): void {
@@ -216,7 +225,7 @@ function render(): void {
   renderIfChanged("campaigns", campaignsSignature(state), renderCampaigns);
   renderIfChanged("creative", campaignViewSignature(state, ["runPublishGate"]), renderCreative);
   renderIfChanged("tasks", campaignViewSignature(state, ["approveAction"]), renderTasks);
-  renderIfChanged("dashboard", dashboardSignature(), renderDashboard);
+  renderIfChanged("dashboard", dashboardSignature(state), renderDashboard);
   renderIfChanged("audit", auditSignature(state), renderAudit);
   renderIfChanged("settings", settingsSignature(state), renderSettings);
 }
@@ -253,6 +262,7 @@ function renderShell(state: AppState): void {
   verifyButton.innerHTML = isLoading("verifyAudit")
     ? `${spinner()} 検証中...`
     : "記録を検証";
+  syncDashboardActionStates(state);
 }
 
 function authModeLabel(state: AppState): string {
@@ -302,9 +312,17 @@ function campaignViewSignature(
   });
 }
 
-function dashboardSignature(): string {
+function dashboardSignature(state: AppState): string {
   return JSON.stringify({
-    campaign: activeOrLatest(),
+    campaignId: activeOrLatest()?.id ?? null,
+    dashboard: state.dashboard,
+    filters: state.dashboardFilters,
+    loading: loadingSignature(state, [
+      "loadDashboard",
+      "checkKillSwitch",
+      "requestKillSwitchStop",
+    ]),
+    failedOperation: state.failedOperation,
   });
 }
 
@@ -786,84 +804,137 @@ function renderTasks(): void {
 
 function renderDashboard(): void {
   const campaign = activeOrLatest();
+  const state = getState();
   const content = el("dashboard-content");
   if (campaign == null) {
     content.innerHTML = emptyState("成果はまだありません", "広告案を作成すると、予測や実データの数字をここで確認できます。");
     destroyChart();
     return;
   }
-  const metric = latestMetric(campaign);
-  const forecastCpa = formatEstimate(
-    campaign.media_plan.estimated_cpa_jpy,
-    campaign.media_plan.estimated_cpa_jpy_range,
-    "yen",
-  );
-  const metricCpa = metric?.cpa_jpy_range
-    ? formatEstimate(metric.cpa_jpy, metric.cpa_jpy_range, "yen")
-    : null;
-  const metricConversions = metric?.conversions_range
-    ? formatEstimate(metric.conversions, metric.conversions_range, "count")
-    : null;
-  content.innerHTML = `
-    <div class="dash-head">
-      <div>
-        <span class="data-label ${metric ? "forecast" : "pending"}">${metric ? dataLabel(metric.data_kind) : "計測待ち"}</span>
-        <h3>${escapeHtml(campaign.brief.name)}</h3>
-        <p>${campaign.publish_result == null ? "広告を出す前の確認中" : "広告を出した状態 / テスト用の結果"}</p>
+  const dashboard = state.dashboard?.campaign_id === campaign.id ? state.dashboard : null;
+  if (dashboard == null) {
+    content.innerHTML = `
+      <div class="dash-head">
+        <div>
+          <span class="data-label pending">集計待ち</span>
+          <h3>${escapeHtml(campaign.brief.name)}</h3>
+          <p>サーバーで成果画面の集計を確認しています。</p>
+        </div>
       </div>
-    </div>
-    <div class="dash-top">
-      ${metricCell("費用対効果", metric ? `${metric.roas.toFixed(2)}倍` : "計測待ち", metric ? `確かさ ${pct(metric.confidence)}` : "確認待ち")}
-      ${metricCell("1件あたりの費用", metric ? (metricCpa?.value ?? formatYen(metric.cpa_jpy)) : forecastCpa.value, metric ? (metricCpa?.sub ?? dataLabel(metric.data_kind)) : forecastCpa.sub)}
-      ${metricCell("成果数", metric ? (metricConversions?.value ?? String(metric.conversions)) : "計測待ち", metric ? (metricConversions?.sub ?? dataLabel(metric.labels.conversions)) : "確認待ち")}
-      ${metricCell("使った広告費", metric ? formatYen(metric.ad_spend_jpy) : "計測待ち", metric ? dataLabel(metric.labels.ad_spend_jpy) : "確認待ち")}
-    </div>
-    <div class="card pad chart-card">
-      <div class="sec-title">現在の成果<span class="hint live">${metric ? `${dataLabel(metric.data_kind)} / 履歴グラフは未接続` : "計測待ち"}</span></div>
-      ${
-        metric
-          ? `<canvas id="performance-chart" height="180" aria-label="現在のコンバージョン"></canvas>`
-          : `<div class="chart-empty">数字の確認後に、現在の成果だけを表示します。</div>`
-      }
-    </div>
-    <div class="guardrail">
-      <span class="gi">!</span>
-      <div class="gt"><b>緊急停止:</b> テスト用の媒体では「止める想定」の確認だけです。実際の広告停止ではありません。</div>
-    </div>
-  `;
-  renderChart(metric);
-}
-
-function renderChart(metric: MetricSnapshot | null): void {
-  const canvas = document.getElementById("performance-chart") as HTMLCanvasElement | null;
-  if (canvas == null || metric == null) {
+      ${loadingPanel("成果データを読み込み中...")}
+    `;
     destroyChart();
     return;
   }
+  content.innerHTML = `
+    <div class="dash-head">
+      <div>
+        <span class="data-label ${dashboardHasMeasuredData(dashboard) ? "forecast" : "pending"}">${escapeHtml(dashboardStateLabel(dashboard))}</span>
+        <h3>${escapeHtml(dashboard.campaign_name)}</h3>
+        <p>${campaign.publish_result == null ? "広告を出す前の確認中" : "広告を出した状態 / テスト用の結果"}</p>
+      </div>
+      <div class="dashboard-controls" aria-label="成果フィルタ">
+        ${periodButtons(dashboard.period)}
+        ${channelButtons(dashboard.channel_filter)}
+      </div>
+    </div>
+    <div class="dash-top" aria-label="主要な成果">
+      ${dashboard.kpis.map(kpiCard).join("")}
+    </div>
+    <div class="dashboard-grid">
+      <section class="dashboard-panel chart-panel" aria-labelledby="dashboard-chart-title">
+        <div class="sec-title" id="dashboard-chart-title">成果推移<span class="hint live">${escapeHtml(chartHint(dashboard))}</span></div>
+        ${chartMarkup(dashboard)}
+      </section>
+      <section class="dashboard-panel" aria-labelledby="channel-status-title">
+        <div class="sec-title" id="channel-status-title">媒体別ステータス<span class="hint">source付き</span></div>
+        <div class="channel-status-list">
+          ${dashboard.channels.map(channelStatusRow).join("") || `<div class="chart-empty">選択中の媒体には配信案がありません。</div>`}
+        </div>
+      </section>
+      <section class="dashboard-panel" aria-labelledby="loop-history-title">
+        <div class="sec-title" id="loop-history-title">改善ループ履歴<span class="hint">捏造提案なし</span></div>
+        <div class="loop-timeline">
+          ${dashboard.improvement_cycles.map(improvementCycleRow).join("")}
+        </div>
+      </section>
+      <section class="dashboard-panel kill-panel" aria-labelledby="kill-switch-title">
+        ${killSwitchPanel(dashboard)}
+      </section>
+    </div>
+    <div class="guardrail">
+      <span class="gi">!</span>
+      <div class="gt"><b>データの扱い:</b> 履歴の線はサーバーから系列が供給された時だけ表示します。欠損点は補間せず「データなし」として扱います。</div>
+    </div>
+  `;
+  renderChart(dashboard);
+  syncDashboardActionStates(state);
+}
+
+function renderChart(dashboard: CampaignDashboard | null): void {
+  const canvas = document.getElementById("performance-chart") as HTMLCanvasElement | null;
+  const conversions = dashboard == null ? null : dashboardMetric(dashboard, "conversions");
+  if (canvas == null || dashboard == null || conversions == null) {
+    destroyChart();
+    return;
+  }
+  const series = conversions.series;
+  const hasSeries = series.some((point) => point.value != null);
+  const chartType = hasSeries ? "line" : "bar";
   const nextSignature = JSON.stringify({
-    id: metric.id,
-    data_kind: metric.data_kind,
-    conversions: metric.conversions,
+    campaignId: dashboard.campaign_id,
+    period: dashboard.period,
+    channel: dashboard.channel_filter,
+    type: chartType,
+    value: conversions.value,
+    series,
   });
   if (chart != null && chart.canvas === canvas && chartSignature === nextSignature) return;
   destroyChart();
   chart = new Chart(canvas, {
-    type: "bar",
+    type: chartType,
     data: {
-      labels: ["現在値"],
+      labels: hasSeries
+        ? series.map((point) => shortDate(point.timestamp))
+        : ["現在値"],
       datasets: [
         {
-          label: dataLabel(metric.data_kind),
-          data: [metric.conversions],
-          borderColor: "#5a5ff0",
-          backgroundColor: "rgba(90,95,240,.14)",
+          label: metricSourceLabel(conversions),
+          data: hasSeries
+            ? series.map((point) => point.value)
+            : [conversions.value ?? 0],
+          borderColor: "#2f6bff",
+          backgroundColor: hasSeries ? "rgba(47,107,255,.10)" : "rgba(47,107,255,.18)",
+          borderWidth: 2,
+          pointRadius: hasSeries ? 3 : 0,
+          tension: 0.22,
+          spanGaps: false,
         },
       ],
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#566173",
+            boxWidth: 12,
+            usePointStyle: true,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: "#566173" },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: "#e6eaf1" },
+          ticks: { color: "#566173" },
+        },
+      },
     },
   });
   chartSignature = nextSignature;
@@ -873,6 +944,348 @@ function destroyChart(): void {
   chart?.destroy();
   chart = null;
   chartSignature = null;
+}
+
+function periodButtons(current: DashboardPeriod): string {
+  const options: Array<{ value: DashboardPeriod; label: string }> = [
+    { value: "7d", label: "7日" },
+    { value: "28d", label: "28日" },
+    { value: "all", label: "全期間" },
+  ];
+  return `
+    <div class="segmented-control" aria-label="期間">
+      ${options
+        .map(
+          (option) => `
+            <button class="segment-button ${option.value === current ? "active" : ""}" type="button" data-dashboard-period="${safeAttr(option.value)}" aria-pressed="${option.value === current}">
+              ${escapeHtml(option.label)}
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function channelButtons(current: DashboardChannelFilter): string {
+  const options: Array<{ value: DashboardChannelFilter; label: string }> = [
+    { value: "all", label: "全体" },
+    { value: "search", label: "検索" },
+    { value: "social", label: "SNS" },
+    { value: "display", label: "バナー" },
+  ];
+  return `
+    <div class="segmented-control" aria-label="媒体">
+      ${options
+        .map(
+          (option) => `
+            <button class="segment-button ${option.value === current ? "active" : ""}" type="button" data-dashboard-channel="${safeAttr(option.value)}" aria-pressed="${option.value === current}">
+              ${escapeHtml(option.label)}
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function kpiCard(metric: DashboardMetric): string {
+  return `
+    <article class="kpi-card">
+      <span class="data-label ${metricBadgeClass(metric)}">${escapeHtml(metricSourceLabel(metric))}</span>
+      <h4>${escapeHtml(metric.label)}</h4>
+      <b>${escapeHtml(formatDashboardMetricValue(metric))}</b>
+      <small>${escapeHtml(metricDetail(metric))}</small>
+    </article>
+  `;
+}
+
+function chartMarkup(dashboard: CampaignDashboard): string {
+  const conversions = dashboardMetric(dashboard, "conversions");
+  if (conversions == null || conversions.value == null) {
+    destroyChart();
+    return `<div class="chart-empty">計測が入るまで、成果のグラフは表示しません。</div>`;
+  }
+  const hasSeries = conversions.series.some((point) => point.value != null);
+  return `
+    <div class="chart-frame">
+      <canvas id="performance-chart" aria-label="コンバージョンの成果グラフ" aria-describedby="performance-chart-alt"></canvas>
+    </div>
+    <p class="sr-only" id="performance-chart-alt">${escapeHtml(chartAlternativeText(conversions))}</p>
+    ${hasSeries ? chartDataTable(conversions.series) : currentValueTable(conversions)}
+  `;
+}
+
+function chartHint(dashboard: CampaignDashboard): string {
+  const conversions = dashboardMetric(dashboard, "conversions");
+  if (conversions == null || conversions.value == null) return "計測待ち";
+  if (conversions.series.some((point) => point.value != null)) {
+    return `${metricSourceLabel(conversions)} / 履歴あり`;
+  }
+  return `${metricSourceLabel(conversions)} / 履歴未接続・現在値`;
+}
+
+function chartAlternativeText(metric: DashboardMetric): string {
+  if (metric.series.some((point) => point.value == null)) {
+    return "コンバージョンの履歴です。値がない日はデータなしとして表示し、補間していません。";
+  }
+  if (metric.series.length > 0) {
+    return "コンバージョンの履歴です。サーバーから供給された系列だけを表示しています。";
+  }
+  return `現在のコンバージョンは${formatDashboardMetricValue(metric)}です。履歴系列は未接続です。`;
+}
+
+function chartDataTable(points: MetricSeriesPoint[]): string {
+  return `
+    <div class="chart-data-table" role="table" aria-label="グラフの元データ">
+      ${points
+        .map(
+          (point) => `
+            <span role="row">
+              <b role="cell">${escapeHtml(shortDate(point.timestamp))}</b>
+              <small role="cell">${escapeHtml(point.value == null ? "データなし" : formatNumber(point.value))}</small>
+            </span>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function currentValueTable(metric: DashboardMetric): string {
+  return `
+    <div class="chart-data-table" role="table" aria-label="グラフの元データ">
+      <span role="row">
+        <b role="cell">現在値</b>
+        <small role="cell">${escapeHtml(formatDashboardMetricValue(metric))}</small>
+      </span>
+    </div>
+  `;
+}
+
+function channelStatusRow(row: ChannelDashboardRow): string {
+  return `
+    <article class="channel-row">
+      <div class="channel-main">
+        <span class="data-label ${channelStatusClass(row.status)}">${escapeHtml(channelStatusLabel(row.status))}</span>
+        <h4>${escapeHtml(row.label)}</h4>
+      </div>
+      <div class="channel-metrics">
+        ${channelMetricCell(row.planned_budget_jpy)}
+        ${channelMetricCell(row.ad_spend_jpy)}
+        ${channelMetricCell(row.roas)}
+        ${channelMetricCell(row.cpa_jpy)}
+        ${channelMetricCell(row.conversions)}
+      </div>
+      <div class="sparkline-wrap" aria-label="${safeAttr(`${row.label}の履歴`)}">
+        ${row.series.some((point) => point.value != null) ? sparklineSvg(row.series) : `<span class="sparkline-empty">履歴なし</span>`}
+      </div>
+    </article>
+  `;
+}
+
+function channelMetricCell(metric: DashboardMetric): string {
+  return `
+    <span class="channel-metric">
+      <b>${escapeHtml(formatDashboardMetricValue(metric))}</b>
+      <small>${escapeHtml(metric.label)} / ${escapeHtml(metricSourceLabel(metric))}</small>
+    </span>
+  `;
+}
+
+function sparklineSvg(points: MetricSeriesPoint[]): string {
+  const values = points
+    .map((point) => point.value)
+    .filter((value): value is number => value != null);
+  if (values.length === 0) return `<span class="sparkline-empty">履歴なし</span>`;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(1, max - min);
+  const width = 120;
+  const height = 34;
+  const step = points.length <= 1 ? width : width / (points.length - 1);
+  const segments: string[] = [];
+  let current: string[] = [];
+  points.forEach((point, index) => {
+    if (point.value == null) {
+      if (current.length > 0) segments.push(current.join(" "));
+      current = [];
+      return;
+    }
+    const x = Math.round(index * step * 100) / 100;
+    const y = Math.round((height - ((point.value - min) / range) * (height - 8) - 4) * 100) / 100;
+    current.push(`${x},${y}`);
+  });
+  if (current.length > 0) segments.push(current.join(" "));
+  return `
+    <svg class="sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="供給された履歴だけを線で表示">
+      ${segments
+        .map((segment) =>
+          segment.includes(" ")
+            ? `<polyline points="${safeAttr(segment)}"></polyline>`
+            : `<circle cx="${safeAttr(segment.split(",")[0])}" cy="${safeAttr(segment.split(",")[1])}" r="2.5"></circle>`,
+        )
+        .join("")}
+    </svg>
+  `;
+}
+
+function improvementCycleRow(cycle: ImprovementCycle): string {
+  const source = cycle.source == null ? "提案なし" : sourceText(cycle.source, cycle.data_kind);
+  return `
+    <article class="loop-item ${safeAttr(cycle.stage)}">
+      <span class="loop-dot" aria-hidden="true"></span>
+      <div>
+        <span class="data-label ${cycle.source == null ? "pending" : "forecast"}">${escapeHtml(source)}</span>
+        <h4>${escapeHtml(cycle.title)}</h4>
+        <p>${escapeHtml(cycle.changed)}</p>
+        <small>${escapeHtml(cycle.result)}</small>
+      </div>
+      ${
+        cycle.evidence_event_type == null
+          ? ""
+          : `<button class="btn ghost loop-evidence" type="button" data-route="audit">根拠</button>`
+      }
+    </article>
+  `;
+}
+
+function killSwitchPanel(dashboard: CampaignDashboard): string {
+  const state = getState();
+  const kill = dashboard.kill_switch;
+  const checkedAt =
+    kill.checked_at == null ? "未確認" : new Date(kill.checked_at).toLocaleString("ja-JP");
+  const busyCheck = isLoading("checkKillSwitch", dashboard.campaign_id);
+  const busyStop = isLoading("requestKillSwitchStop", dashboard.campaign_id);
+  const disableAll = state.loading != null || state.devTokenAvailable !== true;
+  const canStop = state.role === "approver" || state.role === "admin";
+  return `
+    <div class="sec-title" id="kill-switch-title">Kill Switch<span class="hint">監査記録あり</span></div>
+    <div class="kill-state">
+      <span class="data-label ${killSwitchClass(kill.status)}">${escapeHtml(kill.label)}</span>
+      <h4>現在状態</h4>
+      <p>${escapeHtml(kill.reason)}</p>
+      <small>${escapeHtml(`${kill.source == null ? "サーバー確認待ち" : sourceText(kill.source, kill.data_kind)} / ${checkedAt}`)}</small>
+    </div>
+    <div class="kill-actions">
+      <button class="btn ghost" type="button" data-kill-check="${safeAttr(dashboard.campaign_id)}" ${disableAll ? "disabled" : ""}>
+        ${busyCheck ? `${spinner()} 確認中...` : "状態を確認"}
+      </button>
+      <button class="btn primary" type="button" data-kill-stop="${safeAttr(dashboard.campaign_id)}" ${disableAll || !canStop ? "disabled" : ""}>
+        ${busyStop ? `${spinner()} 処理中...` : "止める想定"}
+      </button>
+    </div>
+    <p class="kill-note">テスト用媒体では実停止ではなく、止める想定の確認として監査に残します。</p>
+  `;
+}
+
+function syncDashboardActionStates(state: AppState): void {
+  const canStop = state.role === "approver" || state.role === "admin";
+  document.querySelectorAll<HTMLButtonElement>("[data-kill-stop]").forEach((button) => {
+    const busy = isLoading("requestKillSwitchStop", button.dataset.killStop);
+    button.disabled = state.loading != null || state.devTokenAvailable !== true || !canStop;
+    button.title = canStop ? "止める想定を監査に残す" : "承認者または管理者だけが操作できます";
+    button.innerHTML = busy ? `${spinner()} 処理中...` : "止める想定";
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-kill-check]").forEach((button) => {
+    const busy = isLoading("checkKillSwitch", button.dataset.killCheck);
+    button.disabled = state.loading != null || state.devTokenAvailable !== true;
+    button.innerHTML = busy ? `${spinner()} 確認中...` : "状態を確認";
+  });
+}
+
+function dashboardMetric(
+  dashboard: CampaignDashboard,
+  key: DashboardMetric["key"],
+): DashboardMetric | null {
+  return dashboard.kpis.find((metric) => metric.key === key) ?? null;
+}
+
+function dashboardHasMeasuredData(dashboard: CampaignDashboard): boolean {
+  return dashboard.kpis.some((metric) => metric.value != null && metric.source != null);
+}
+
+function dashboardStateLabel(dashboard: CampaignDashboard): string {
+  const spend = dashboardMetric(dashboard, "ad_spend_jpy");
+  if (spend == null || spend.value == null) return "計測待ち";
+  return metricSourceLabel(spend);
+}
+
+function formatDashboardMetricValue(metric: DashboardMetric): string {
+  if (metric.value == null) {
+    if (metric.status === "measurement_pending") return "計測待ち";
+    return "データなし";
+  }
+  if (metric.unit === "jpy") return formatYen(metric.value);
+  if (metric.unit === "ratio") return `${metric.value.toFixed(2)}倍`;
+  return formatNumber(metric.value);
+}
+
+function metricDetail(metric: DashboardMetric): string {
+  if (metric.value == null) return "サーバー確認待ち";
+  const range = metric.estimate_range == null ? "" : ` / ${estimateRangeLabel(metric)}`;
+  return `${metricSourceLabel(metric)}${range}`;
+}
+
+function estimateRangeLabel(metric: DashboardMetric): string {
+  const range = metric.estimate_range;
+  if (range == null) return "";
+  if (metric.unit === "ratio") return `目安 ${range.low.toFixed(2)}〜${range.high.toFixed(2)}倍`;
+  if (metric.unit === "jpy") return `目安 ${formatYen(range.low)}〜${formatYen(range.high)}`;
+  return `目安 ${formatNumber(range.low)}〜${formatNumber(range.high)}`;
+}
+
+function metricSourceLabel(metric: DashboardMetric): string {
+  if (metric.source == null) {
+    if (metric.status === "measurement_pending") return "計測待ち";
+    return "データなし";
+  }
+  return sourceText(metric.source, metric.data_kind);
+}
+
+function sourceText(source: string, dataKind: string | null): string {
+  if (source === "ga4_shopify") return "実データ";
+  if (source === "media_plan_mock") return "テスト用";
+  if (source === "ga4_shopify_mock" || source === "mock_media") return "テスト用";
+  if (dataKind === "measured") return "実データ";
+  return "自動推定";
+}
+
+function metricBadgeClass(metric: DashboardMetric): string {
+  if (metric.value == null || metric.source == null) return "pending";
+  if (metric.data_kind === "measured") return "forecast";
+  return "amber";
+}
+
+function channelStatusLabel(status: ChannelDashboardRow["status"]): string {
+  if (status === "pending") return "確認待ち";
+  if (status === "stopped") return "停止想定";
+  if (status === "test") return "テスト用";
+  return "配信中";
+}
+
+function channelStatusClass(status: ChannelDashboardRow["status"]): string {
+  if (status === "pending") return "pending";
+  if (status === "stopped") return "amber";
+  if (status === "test") return "amber";
+  return "forecast";
+}
+
+function killSwitchClass(status: CampaignDashboard["kill_switch"]["status"]): string {
+  if (status === "not_checked") return "pending";
+  if (status === "would_stop" || status === "stopped") return "amber";
+  return "forecast";
+}
+
+function shortDate(value: string): string {
+  return new Date(value).toLocaleDateString("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+  });
+}
+
+function formatNumber(value: number): string {
+  return Math.round(value).toLocaleString("ja-JP");
 }
 
 function renderAudit(): void {
@@ -938,6 +1351,7 @@ function auditEventLabel(eventType: string): string {
     "campaign.publish.approved": "広告を出す承認",
     "campaign.publish.rejected": "広告を出す確認を差し戻し",
     "campaign.kill_switch.evaluated": "緊急停止を判定",
+    "campaign.kill_switch.stop_requested": "止める想定を確認",
     "campaign.audit.verified": "記録を検証",
   };
   return labels[eventType] ?? "操作記録";
@@ -952,6 +1366,7 @@ function auditSummary(entry: { event_type: string; summary: string }): string {
     "campaign.publish.approved": "確認待ちだった広告開始を承認し、テスト用の媒体へ送信しました。",
     "campaign.publish.rejected": "確認待ちだった広告開始を差し戻しました。実際の広告操作は行っていません。",
     "campaign.kill_switch.evaluated": "緊急停止の判定を実行しました。",
+    "campaign.kill_switch.stop_requested": "緊急停止の止める想定を確認しました。テスト用のため実停止は行っていません。",
   };
   return summaries[entry.event_type] ?? entry.summary;
 }
@@ -1059,6 +1474,7 @@ function allDataIntegrations(): DataIntegration[] {
 }
 
 async function bootstrap(): Promise<void> {
+  setState({ dashboardFilters: loadStoredDashboardFilters() });
   renderNav();
   bindEvents();
   subscribe(render);
@@ -1090,6 +1506,28 @@ function bindEvents(): void {
     const integrationConnect = target.closest<HTMLButtonElement>("[data-integration-connect]");
     if (integrationConnect?.dataset.integrationConnect != null) {
       showIntegrationNotice(integrationConnect.dataset.integrationConnect);
+    }
+
+    const dashboardPeriod = target.closest<HTMLButtonElement>("[data-dashboard-period]");
+    if (dashboardPeriod?.dataset.dashboardPeriod != null) {
+      updateDashboardFilters({
+        period: dashboardPeriod.dataset.dashboardPeriod as DashboardPeriod,
+      });
+    }
+
+    const dashboardChannel = target.closest<HTMLButtonElement>("[data-dashboard-channel]");
+    if (dashboardChannel?.dataset.dashboardChannel != null) {
+      updateDashboardFilters({
+        channel: dashboardChannel.dataset.dashboardChannel as DashboardChannelFilter,
+      });
+    }
+
+    const killCheck = target.closest<HTMLButtonElement>("[data-kill-check]");
+    if (killCheck?.dataset.killCheck != null) void checkKillSwitch(killCheck.dataset.killCheck);
+
+    const killStop = target.closest<HTMLButtonElement>("[data-kill-stop]");
+    if (killStop?.dataset.killStop != null) {
+      void requestKillSwitchStop(killStop.dataset.killStop);
     }
 
     const selectCampaign = target.closest<HTMLButtonElement>("[data-select-campaign]");
@@ -1246,11 +1684,98 @@ async function approvePendingAction(actionId: string): Promise<void> {
   try {
     const approved = await api.approveAction(campaign.id, actionId);
     upsertCampaign(approved);
-    setRoute("dashboard");
     setState({ loading: null });
+    setRoute("dashboard");
   } catch (error) {
     setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
   }
+}
+
+async function loadDashboard(): Promise<void> {
+  const campaign = activeOrLatest();
+  if (campaign == null) return;
+  if (!beginOperation({ operation: "loadDashboard", targetId: campaign.id })) return;
+  try {
+    const dashboard = await fetchDashboard(campaign.id);
+    setState({ dashboard, error: null, loading: null });
+  } catch (error) {
+    setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
+  }
+}
+
+async function checkKillSwitch(campaignId: string): Promise<void> {
+  if (!beginOperation({ operation: "checkKillSwitch", targetId: campaignId })) return;
+  try {
+    await api.evaluateKillSwitch(campaignId);
+    const dashboard = await fetchDashboard(campaignId);
+    setState({ dashboard, error: null, loading: null });
+  } catch (error) {
+    setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
+  }
+}
+
+async function requestKillSwitchStop(campaignId: string): Promise<void> {
+  if (!beginOperation({ operation: "requestKillSwitchStop", targetId: campaignId })) return;
+  try {
+    await api.requestKillSwitchStop(campaignId);
+    const dashboard = await fetchDashboard(campaignId);
+    setState({ dashboard, error: null, loading: null });
+  } catch (error) {
+    setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
+  }
+}
+
+async function fetchDashboard(campaignId: string): Promise<CampaignDashboard> {
+  const filters = getState().dashboardFilters;
+  return api.getDashboard(campaignId, filters.period, filters.channel);
+}
+
+function updateDashboardFilters(
+  patch: Partial<{ period: DashboardPeriod; channel: DashboardChannelFilter }>,
+): void {
+  const dashboardFilters = { ...getState().dashboardFilters, ...patch };
+  saveDashboardFilters(dashboardFilters);
+  setState({ dashboardFilters });
+  void loadDashboard();
+}
+
+function loadStoredDashboardFilters(): {
+  period: DashboardPeriod;
+  channel: DashboardChannelFilter;
+} {
+  try {
+    const raw = localStorage.getItem(dashboardFilterStorageKey);
+    if (raw == null) return { period: "28d", channel: "all" };
+    const parsed = JSON.parse(raw) as Partial<{
+      period: DashboardPeriod;
+      channel: DashboardChannelFilter;
+    }>;
+    return {
+      period: isDashboardPeriod(parsed.period) ? parsed.period : "28d",
+      channel: isDashboardChannel(parsed.channel) ? parsed.channel : "all",
+    };
+  } catch {
+    return { period: "28d", channel: "all" };
+  }
+}
+
+function saveDashboardFilters(filters: {
+  period: DashboardPeriod;
+  channel: DashboardChannelFilter;
+}): void {
+  try {
+    localStorage.setItem(dashboardFilterStorageKey, JSON.stringify(filters));
+  } catch {
+    // The filters are a convenience only; server data remains the truth source.
+  }
+}
+
+function isDashboardPeriod(value: unknown): value is DashboardPeriod {
+  return value === "7d" || value === "28d" || value === "all";
+}
+
+function isDashboardChannel(value: unknown): value is DashboardChannelFilter {
+  return value === "all" || value === "search" || value === "social" || value === "display";
 }
 
 async function loadAudit(): Promise<void> {
