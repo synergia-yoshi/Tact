@@ -84,7 +84,7 @@ def get_secret_resolver() -> SecretResolver:
     settings = get_settings()
     if any(
         GoogleSecretManagerResolver.is_secret_ref(value)
-        for value in (settings.media_api_key, settings.llm_api_key)
+        for value in (settings.media_api_key, settings.llm_api_key, settings.auth_token_secret)
     ):
         return GoogleSecretManagerResolver(project_id=settings.gcp_project_id)
     return PlainSecretResolver()

@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.adapters.media import MediaPerformanceResponse
+from app.auth import AuthContext, get_auth_context
 from app.dependencies import get_campaign_service
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import CampaignBrief, CampaignProposal
@@ -25,20 +26,23 @@ router = APIRouter(prefix="/api/v1/campaigns", tags=["campaigns"])
 async def create_campaign_proposal(
     brief: CampaignBrief,
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CampaignProposal:
-    return await service.create_proposal(brief)
+    return await service.create_proposal(brief, auth_context)
 
 
 @router.get("", response_model=list[CampaignProposal])
 async def list_campaigns(
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> list[CampaignProposal]:
-    return service.list_campaigns()
+    return service.list_campaigns(auth_context)
 
 
 @router.get("/audit/verify", response_model=AuditVerificationResult)
 async def verify_audit(
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    _auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> AuditVerificationResult:
     return service.verify_audit()
 
@@ -47,9 +51,10 @@ async def verify_audit(
 async def get_campaign(
     campaign_id: str,
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CampaignProposal:
     try:
-        return service.get_campaign(campaign_id)
+        return service.get_campaign(campaign_id, auth_context)
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -61,9 +66,10 @@ async def get_campaign(
 async def publish_campaign(
     campaign_id: str,
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CampaignProposal:
     try:
-        return await service.publish_campaign(campaign_id)
+        return await service.publish_campaign(campaign_id, auth_context)
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -76,9 +82,10 @@ async def approve_campaign_action(
     campaign_id: str,
     action_id: str,
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CampaignProposal:
     try:
-        return await service.approve_action(campaign_id, action_id)
+        return await service.approve_action(campaign_id, action_id, auth_context)
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -101,9 +108,10 @@ async def reject_campaign_action(
     campaign_id: str,
     action_id: str,
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> CampaignProposal:
     try:
-        return service.reject_action(campaign_id, action_id)
+        return service.reject_action(campaign_id, action_id, auth_context)
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -125,9 +133,10 @@ async def reject_campaign_action(
 async def get_campaign_performance(
     campaign_id: str,
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> MediaPerformanceResponse:
     try:
-        return await service.get_performance(campaign_id)
+        return await service.get_performance(campaign_id, auth_context)
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -144,9 +153,10 @@ async def get_campaign_performance(
 async def list_campaign_audit(
     campaign_id: str,
     service: Annotated[CampaignService, Depends(get_campaign_service)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> list[AuditEntry]:
     try:
-        return service.list_campaign_audit(campaign_id)
+        return service.list_campaign_audit(campaign_id, auth_context)
     except CampaignNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

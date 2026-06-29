@@ -52,6 +52,8 @@ class AgentAction(BaseModel):
 
 class CampaignProposal(BaseModel):
     id: str = Field(default_factory=lambda: f"cmp_{uuid4().hex}")
+    org_id: str = "dev-org"
+    created_by: str = "dev-user"
     brief: CampaignBrief
     creative: CreativeDraft
     media_plan: MediaPlanResponse

@@ -13,17 +13,23 @@ class FirestoreCampaignRepository(CampaignRepository):
         self._collection.document(proposal.id).set(proposal.model_dump(mode="json"))
         return proposal
 
-    def get(self, campaign_id: str) -> CampaignProposal | None:
+    def get(self, campaign_id: str, *, org_id: str | None = None) -> CampaignProposal | None:
         snapshot = self._collection.document(campaign_id).get()
         if not snapshot.exists:
             return None
-        return CampaignProposal.model_validate(snapshot.to_dict())
+        proposal = CampaignProposal.model_validate(snapshot.to_dict())
+        if org_id is not None and proposal.org_id != org_id:
+            return None
+        return proposal
 
-    def list(self) -> list[CampaignProposal]:
-        return [
+    def list(self, *, org_id: str | None = None) -> list[CampaignProposal]:
+        proposals = [
             CampaignProposal.model_validate(snapshot.to_dict())
             for snapshot in self._collection.stream()
         ]
+        if org_id is None:
+            return proposals
+        return [proposal for proposal in proposals if proposal.org_id == org_id]
 
 
 class FirestoreAuditRepository(AuditRepository):
@@ -34,6 +40,7 @@ class FirestoreAuditRepository(AuditRepository):
         self,
         *,
         event_type: str,
+        org_id: str = "dev-org",
         actor: str,
         subject_type: str,
         subject_id: str,
@@ -45,6 +52,7 @@ class FirestoreAuditRepository(AuditRepository):
         previous = self._last_entry()
         entry = AuditEntry.create(
             event_type=event_type,
+            org_id=org_id,
             actor=actor,
             subject_type=subject_type,
             subject_id=subject_id,
@@ -60,11 +68,18 @@ class FirestoreAuditRepository(AuditRepository):
     def list(self) -> list[AuditEntry]:
         return self._ordered_entries()
 
-    def list_for_subject(self, subject_type: str, subject_id: str) -> list[AuditEntry]:
+    def list_for_subject(
+        self,
+        subject_type: str,
+        subject_id: str,
+        *,
+        org_id: str | None = None,
+    ) -> list[AuditEntry]:
         return [
             entry
             for entry in self._ordered_entries()
             if entry.subject_type == subject_type and entry.subject_id == subject_id
+            and (org_id is None or entry.org_id == org_id)
         ]
 
     def verify(self) -> AuditVerificationResult:
