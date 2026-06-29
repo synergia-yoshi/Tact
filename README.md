@@ -11,6 +11,8 @@ explicit assumptions:
   the mock implementations later without changing service code.
 - Secrets are loaded only from server-side environment variables or `.env`.
   They are never committed and are not returned from public API responses.
+- The polished product UI is served by FastAPI as static HTML/CSS/JS from
+  `app/web`, using `design-reference.html` as the visual source of truth.
 
 ## Local setup
 
@@ -31,6 +33,8 @@ python3 -m ruff check .
 
 ## API overview
 
+- `GET /` - serve the Tact UI shell.
+- `GET /static/*` - serve UI assets bundled with the FastAPI package.
 - `GET /health` - service health and active adapter kinds.
 - `POST /api/v1/campaigns/proposals` - create a campaign proposal from a brief.
 - `GET /api/v1/campaigns` - list stored campaign proposals.
@@ -95,6 +99,8 @@ Example proposal request:
   media status while real media stop APIs are not connected.
 - Milestone 9: production auth hardening with token expiry, disabled-auth
   production guard, and a reusable role policy matrix.
+- Milestone 10: UI design-system shell based on `design-reference.html`, with
+  six navigation screens, responsive layout, and honest pre-API labels.
 
 ## Persistence and secrets
 
@@ -187,6 +193,7 @@ Role-gated operations use the shared policy matrix in `app/policy.py`:
 - [x] Production cannot boot with `AUTH_MODE=disabled`.
 - [x] Signed bearer tokens require `exp` and expired tokens are rejected.
 - [x] Publish approval and audit verification are role-gated by policy matrix.
+- [x] UI shell is served from `/` with six button-based navigation screens.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions

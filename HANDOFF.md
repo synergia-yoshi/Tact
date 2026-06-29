@@ -2,82 +2,117 @@
 
 ## 1. Target SSoT
 
-Current SSoT is `synergia-yoshi/cursor` FastAPI MVP, local branch
-`codex/policy-auth-hardening` stacked on `codex/kill-switch-status` commit
-`d1fa295e1ab59ddbd737a52a5f85d80c836f4448` / PR #9.
+Current SSoT is `synergia-yoshi/cursor` FastAPI MVP + UI shell, local branch
+`codex/ui-shell-design-system` stacked on `codex/policy-auth-hardening` commit
+`61627b608a264b87bdc1673ac78e44fd9d750af4` / PR #10.
+
+Visual SSoT is `design-reference.html` at the repository root. The reference is
+included unchanged for review.
 
 ## 2. What changed
 
-- Added `app/policy.py` with a reusable policy matrix for execution vs
-  recommendation boundaries.
-- Added role gates for:
-  - publish approval: `approver` or `admin`
-  - publish rejection: `approver` or `admin`
-  - audit hash-chain verification: `admin`
-  - Kill Switch evaluation: `operator`, `approver`, or `admin`
-  - future budget change, legal override, and real Kill Switch stop operations.
-- Changed local disabled auth to use a fixed admin dev context, preserving local
-  MVP ergonomics while keeping production guarded.
-- Added a settings validation guard that rejects `APP_ENV=production` or
-  `APP_ENV=prod` when `AUTH_MODE=disabled`.
-- Added `exp` to generated signed bearer tokens and reject missing/expired `exp`
-  during verification.
-- Updated README and `.env.example` with production auth and policy notes.
-- Added regression tests for production auth guard, token expiry, missing `exp`,
-  publish approval role gate, and audit verify role gate.
+- Added a FastAPI-served UI shell at `GET /`.
+- Added static UI assets under `app/web`:
+  - `app/web/index.html`
+  - `app/web/static/styles.css`
+  - `app/web/static/app.js`
+- Added six button-based sidebar navigation screens:
+  - Home
+  - Campaigns
+  - Tasks / approval queue
+  - Creative
+  - Audit
+  - Settings
+- Adopted the reference design tokens:
+  - background `#eef2f8`
+  - surfaces `#fff` / `#f6f8fc`
+  - accent gradient `#2f6bff` -> `#6d5cf5`
+  - green/red/amber status colors
+  - Inter + Noto Sans JP
+  - 14px radius and soft shadow tiers
+- Replaced reference-style `<a onclick>` navigation with accessible `<button>`
+  controls and `aria-label` support for mobile icon navigation.
+- Added honest pre-API labels so polished UI does not imply live backend data:
+  - server not connected
+  - forecast / simulation
+  - approval required
+  - mock / no real stop
+- Added root/static UI tests and packaged `app/web` into the wheel.
+- Updated README.
+
+UI stack choice: FastAPI static HTML/CSS/JS, because the current trusted backend
+is Python-only and same-origin static delivery lets the next PR wire the UI to
+the existing API without adding a Node build/deploy surface yet.
 
 ## 3. Current state
 
 - Working:
-  - Server refuses disabled auth in production settings.
-  - Signed bearer tokens now require valid `sub`, `org_id`, `roles`, and `exp`.
-  - Operator tokens can request publish approval but cannot approve it.
-  - Approver tokens can approve pending publish actions within the same org.
-  - Operator tokens cannot run global audit verify; admin tokens can.
-  - Local `AUTH_MODE=disabled` tests still exercise the MVP using dev admin.
+  - `/` serves the UI shell.
+  - `/static/styles.css` and `/static/app.js` are served.
+  - Six navigation screens switch without page reload.
+  - Evidence modal opens/closes.
+  - Desktop and mobile layouts render without page-level horizontal overflow.
+  - Mobile nav keeps accessible names through `aria-label`.
+- Screen wiring status:
+  - Home: design shell only; not yet posting `CampaignBrief`.
+  - Campaigns: honest forecast/simulation placeholder; not yet listing API data.
+  - Tasks: approval queue shell; not yet reading pending actions.
+  - Creative: design placeholder; not yet using proposal creative/legal output.
+  - Audit: hash-chain shell; not yet reading campaign audit or admin verify.
+  - Settings: mock connection state; not yet backed by real account mapping.
 - Not working yet:
-  - Firestore audit append-only writes are not transaction-enforced yet.
-  - Legal check remains rule-based substring matching.
-  - No real budget-change, legal-override, or live media stop endpoint exists.
-- Known risk:
-  - Policy is enforced in service methods touched by this PR, but future
-    mutation endpoints must call the same matrix before implementation.
+  - No signed bearer token UI storage/minting flow.
+  - No proposal API call from the 3-question form.
+  - No measurement/legal/pending approval flow in the browser yet.
+  - No dashboard MetricSnapshot or Kill Switch API wiring yet.
 
 ## 4. Validation
 
 - `.\.venv312\Scripts\python.exe -m pip install -e ".[dev]"` passed.
-- `.\.venv312\Scripts\python.exe -m pytest` passed: 33 tests.
+- `.\.venv312\Scripts\python.exe -m pytest` passed: 36 tests.
 - `.\.venv312\Scripts\python.exe -m ruff check .` passed.
 - `git diff --check` passed.
+- Local server smoke on `http://127.0.0.1:8010/` passed:
+  - `/` returned 200.
+  - `/static/styles.css` returned 200.
+  - `/static/app.js` returned 200.
+  - `/health` returned 200.
+- Browser QA passed:
+  - desktop screenshot rendered the shell and home form.
+  - mobile viewport `390x844` had 6 nav controls and no page-level horizontal
+    overflow.
+  - mobile navigation to Audit worked.
+  - evidence modal opened and closed.
 - Warning observed: FastAPI/Starlette TestClient emits a deprecation warning
   recommending `httpx2`; no test failure.
 
 ## 5. Assumptions made
 
-- Local disabled auth should remain convenient, so the fixed dev identity is now
-  admin while production startup blocks disabled auth.
-- `approver` is the minimum role allowed to execute a media publish approval or
-  rejection.
-- Audit verification is global enough to require `admin`.
-- Token TTL defaults to one hour when generated by the test/helper function;
-  production token minting remains outside this repository.
+- Milestone 1 should establish the shell/design-system only; API wiring starts
+  in Milestone 2.
+- Static HTML/CSS/JS is sufficient for this milestone and avoids introducing a
+  Node dependency before the UI needs client state orchestration.
+- The UI may show carefully labeled placeholders only when they are explicit
+  about server connection state, forecast/simulation status, or mock boundaries.
+- `design-reference.html` is a review artifact and visual SSoT, so it is
+  committed unchanged.
 
 ## 6. Next work
 
-1. Make Firestore audit writes append-only with transaction checks around
-   `prev_hash`.
-2. Expand legal check vocabulary and severity handling beyond substring rules.
-3. Add real GA4 + Shopify read adapters and account mapping.
-4. Add Google Ads OAuth setup while keeping publish/budget changes
-   `pending_approval`.
-5. Implement live media stop/pause adapter methods only after scopes and human
-   approval rules are decided.
+1. Wire the home 3-question form to `POST /api/v1/campaigns/proposals`.
+2. Add a signed bearer development token flow for operator/approver/admin roles.
+3. Render generated creative and media plan from the proposal response.
+4. Add evidence modal content from server-derived proposal inputs and adapter
+   outputs.
+5. Replace placeholder forecasts with labeled ranges and confidence derived from
+   server-side simulation/read-model data.
 
 ## 7. Awaiting approval / decisions
 
-- Exact production token issuer and TTL policy are not decided.
-- Whether publish approval needs second approval for high budgets is undecided.
-- Who can execute live emergency stop, and whether that requires two-person
-  approval, is undecided.
-- Firestore security rules and deployment IAM boundaries still need review
-  before production.
+- Whether to keep static HTML/JS through Milestone 2 or switch to React once
+  state orchestration grows.
+- The production token issuer and how local reviewers should obtain
+  operator/approver/admin tokens.
+- Exact copy for customer-facing versus operator-facing role separation.
+- Whether `design-reference.html` should remain in the repository permanently
+  after implementation catches up.
