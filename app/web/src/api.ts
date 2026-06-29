@@ -13,8 +13,11 @@ import type {
   RoleAssignment,
   UiError,
 } from "./types";
+import { demoApi } from "./demoApi";
 
 let bearerToken: string | null = null;
+export const isDemoMode =
+  import.meta.env.VITE_DEMO_MODE === "1" || import.meta.env.VITE_DEMO_MODE === "true";
 
 export function setBearerToken(token: string | null): void {
   bearerToken = token;
@@ -71,7 +74,7 @@ function translateConflict(detail: string): string {
   return `操作の前提条件が満たされていません: ${detail}`;
 }
 
-export const api = {
+const realApi = {
   devToken(role: Role): Promise<DevTokenResponse> {
     return requestJson<DevTokenResponse>("/api/v1/auth/dev-token", {
       method: "POST",
@@ -146,3 +149,5 @@ export const api = {
     });
   },
 };
+
+export const api = isDemoMode ? demoApi : realApi;

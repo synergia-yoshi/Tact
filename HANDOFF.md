@@ -4,96 +4,115 @@
 
 Repo: `synergia-yoshi/Tact`
 Local path: `C:\dev\repos\Tact`
-Branch: `codex/ms5-role-separation`
-Base: `origin/codex/ms4-rich-dashboard` / PR #14
-Draft PR: `https://github.com/synergia-yoshi/Tact/pull/15`
+Branch: `codex/responsive-netlify-demo`
+Base: `origin/codex/ms5-role-separation` / PR #15
+Draft PR: `https://github.com/synergia-yoshi/Tact/pull/16`
 
-MS5 implements the role-separation brief from
-`2026-06-30-Codex-MS5-role-separation.md`. The FastAPI backend is the
-authority for permissions; the frontend only mirrors available actions and
-navigation.
+This branch implements the responsive + Netlify static demo brief from
+`2026-06-30-Codex-responsive-and-netlify.md`. It is stacked on MS5 role
+separation and keeps the normal FastAPI-backed build intact.
 
 ## 2. What Changed
 
-- Added the `viewer` role beside `operator`, `approver`, and `admin`.
-- Expanded `app/policy.py` with explicit read/write operations:
-  `campaign.read`, `campaign.create`, `campaign.operate`, `dashboard.read`,
-  `audit.read`, and `role.manage`.
-- Added a global `PolicyViolationError` handler so denied server actions return
-  HTTP 403 instead of depending on hidden UI controls.
-- Added role-assignment models and `/api/v1/roles` endpoints. Only admins can
-  list or update role assignments, and updates append hash-chain audit events.
-- Scoped customer reads for viewer/approver roles:
-  internal request/account IDs, targeting, creative specs, action payloads, and
-  execution results are redacted from campaign reads.
-- Kept operational actions operator/admin only and approval actions
-  approver/admin only.
-- Updated frontend role switching, navigation, home landing, tasks, dashboard
-  controls, audit access, settings access, and a new admin-only role management
-  screen.
-- Preserved dashboard chart DOM stability while changing roles; unchanged chart
-  data is not recreated during role toggles.
-- Rebuilt committed Vite assets in `app/web/dist`.
+- Added `VITE_DEMO_MODE` switching in `app/web/src/api.ts`.
+  - Normal build: frontend continues to call relative `/api/v1/...`.
+  - Demo build: frontend uses an in-browser mock API and does not require the
+    FastAPI backend.
+- Added `app/web/src/demoApi.ts`, which supports:
+  proposal creation, dashboard metrics, legal gate, approval, Kill Switch
+  evaluate/stop simulation, integration catalog UI, audit verification, and
+  role assignment updates.
+- Added `app/web/src/demoApi.test.ts` to verify the browser mock keeps all
+  returned dashboard data simulated and customer reads redacted.
+- Added a fixed demo banner:
+  `デモ環境 ― 実データではありません（テスト用）`.
+- Added demo-mode copy guards so source labels and settings text stay test-only
+  in demo mode.
+- Added `netlify.toml`:
+  - build command: `npm run build:demo`
+  - publish directory: `app/web/dist`
+  - env: `VITE_DEMO_MODE=1`
+  - SPA redirect: `/* /index.html 200`
+- Strengthened responsive CSS:
+  - no document-level horizontal scroll on target widths
+  - mobile nav folds into an icon rail with internal scrolling
+  - primary tap targets are at least 44px
+  - dashboard/settings/cards stack cleanly on narrow widths
+- Added Playwright coverage for 360, 390, 768, 1024, 1280, and 1440 widths.
+- Rebuilt committed Vite assets in `app/web/dist` with the normal non-demo
+  build.
 
 ## 3. Current State
 
 Working:
 
-- Viewer: read-only customer surface. Can view dashboard/tasks/home, cannot
-  create proposals, run gates, approve, stop, view audit, or manage roles.
-- Approver: customer surface with approve/reject and Kill-stop simulation.
-  Cannot create/gate, view internal audit, settings, or role management.
-- Operator: operational surface with create/gate/dashboard/audit, but cannot
-  approve, stop, access settings, or manage roles.
-- Admin: full access, including settings, audit verification, and role
-  assignment changes.
-- API and UI agree on forbidden actions. Tests assert 403s at the API boundary,
-  not only hidden buttons.
-- Role changes are visible in audit and can be verified through the existing
-  audit hash-chain verification endpoint.
+- Normal local/FastAPI mode still uses the backend through relative `/api/v1`
+  URLs.
+- Netlify/static demo mode can run without backend services.
+- Demo mode supports the primary flow:
+  create proposal -> dashboard -> approval -> Kill stop simulation ->
+  integration catalog -> audit -> role switch.
+- Viewer/approver/operator/admin role behavior from MS5 is preserved in demo
+  mode.
+- Demo API returns simulated/test-use data and redacts customer-role campaign
+  reads.
+- Demo banner is always visible when `VITE_DEMO_MODE` is enabled.
 
 Still simulated/mock:
 
-- Role assignment persistence is in-memory for local/dev use.
-- Development tokens are still the local role-switching mechanism.
-- Measurement, media planning, publish, delivery, and Kill-stop behavior remain
-  mock/test implementations from earlier milestones.
+- Demo data is in-memory browser state and resets on reload.
+- Netlify demo does not connect OAuth, media APIs, GA4, Shopify, or real auth.
+- Kill stop remains a simulation and does not perform any real delivery action.
 
-## 4. Validation
+## 4. Netlify Setup
 
-- `.\.venv312\Scripts\python.exe -m pytest` passed: 43 tests.
-- `.\.venv312\Scripts\python.exe -m ruff check .` passed.
+Use the checked-in `netlify.toml`.
+
+- Build command: `npm run build:demo`
+- Publish directory: `app/web/dist`
+- Environment variable: `VITE_DEMO_MODE=1`
+- SPA redirect is already configured:
+  `from = "/*"`, `to = "/index.html"`, `status = 200`
+
+Local demo build on PowerShell:
+
+```powershell
+$env:VITE_DEMO_MODE='1'; npm run build:demo; Remove-Item Env:VITE_DEMO_MODE
+```
+
+Local normal build:
+
+```powershell
+npm run build
+```
+
+## 5. Validation
+
 - `npm run test` passed:
   TypeScript typecheck and Vitest.
-- `npm run test:e2e` passed: 4 Playwright tests.
+- `npm run test:e2e` passed: 5 Playwright tests.
+  Coverage includes the existing role/dashboard flows plus responsive checks for
+  360, 390, 768, 1024, 1280, and 1440 widths.
+- `VITE_DEMO_MODE=1 npm run build:demo` equivalent passed via PowerShell env.
+- `.\.venv312\Scripts\python.exe -m pytest` passed: 43 tests.
+- `.\.venv312\Scripts\python.exe -m ruff check .` passed.
 - `git diff --check` passed.
 
-Known warning: FastAPI/Starlette TestClient emits the existing `httpx2`
-deprecation warning only.
-
-## 5. Assumptions Made
+## 6. Assumptions Made
 
 - PR split remains:
   - #12: MS2 Vite vertical slice
   - #13: MS2.5-MS3.5 UI/generation experience
   - #14: MS4 rich dashboard
   - #15: MS5 role separation
-- MS5 stacks on PR #14 via branch `codex/ms5-role-separation`.
-- In-memory role assignment is acceptable for MS5 because the brief allows a
-  mock/dev-token expression.
+  - #16: responsive + Netlify static demo
+- `build:demo` intentionally relies on Netlify or the caller setting
+  `VITE_DEMO_MODE=1`; the script itself remains cross-platform.
 - `app/web/dist` remains committed because FastAPI serves built assets directly.
 
-## 6. Next Work
+## 7. Next Work
 
-1. Implement the responsive + Netlify demo brief on a new branch stacked on
-   `codex/ms5-role-separation`.
-2. Add a browser-only demo API behind `VITE_DEMO_MODE` so Netlify can serve a
-   static demo without the FastAPI backend.
-3. Add a persistent role store when production identity/session design is ready.
-4. Continue backend hardening separately: Firestore append-only transactions,
-   real GA4/Shopify adapters, Google Ads OAuth, and production auth issuer.
-
-## 7. Awaiting Approval / Decisions
-
-- Confirm whether MS5 role assignment should remain dev-only until production
-  identity work begins.
+1. Deploy the Netlify demo from this branch after PR review.
+2. Add persistent demo seeding only if stakeholders need reload-stable state.
+3. Keep production auth, OAuth, real media APIs, and real measurement adapters
+   on the backend hardening track.
