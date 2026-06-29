@@ -4,14 +4,17 @@ from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.adapters.media import MediaPlanResponse, MediaPublishResponse
 
 CampaignStatus = Literal["proposed", "draft", "scheduled", "published", "failed"]
+ApprovalStatus = Literal["pending_approval", "approved", "rejected"]
 
 
 class CampaignBrief(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(min_length=1, max_length=120)
     objective: str = Field(min_length=1, max_length=80)
     target_audience: str = Field(min_length=1, max_length=240)
@@ -37,11 +40,22 @@ class CreativeDraft(BaseModel):
     compliance_notes: list[str] = Field(default_factory=list)
 
 
+class AgentAction(BaseModel):
+    id: str = Field(default_factory=lambda: f"act_{uuid4().hex}")
+    kind: Literal["publish_campaign"]
+    payload: dict
+    guardrail_result: dict
+    approval_status: ApprovalStatus = "pending_approval"
+    execution_result: dict | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+
+
 class CampaignProposal(BaseModel):
     id: str = Field(default_factory=lambda: f"cmp_{uuid4().hex}")
     brief: CampaignBrief
     creative: CreativeDraft
     media_plan: MediaPlanResponse
+    actions: list[AgentAction] = Field(default_factory=list)
     publish_result: MediaPublishResponse | None = None
     status: CampaignStatus = "proposed"
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
