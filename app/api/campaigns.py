@@ -10,6 +10,7 @@ from app.models.campaign import CampaignBrief, CampaignProposal
 from app.models.kill_switch import KillSwitchResult
 from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
+from app.policy import PolicyViolationError
 from app.services import (
     AgentActionNotFoundError,
     AgentActionNotPendingError,
@@ -47,9 +48,12 @@ async def list_campaigns(
 @router.get("/audit/verify", response_model=AuditVerificationResult)
 async def verify_audit(
     service: Annotated[CampaignService, Depends(get_campaign_service)],
-    _auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> AuditVerificationResult:
-    return service.verify_audit()
+    try:
+        return service.verify_audit(auth_context)
+    except PolicyViolationError as error:
+        raise _policy_violation(error) from error
 
 
 @router.get("/{campaign_id}", response_model=CampaignProposal)
@@ -177,6 +181,8 @@ async def evaluate_campaign_kill_switch(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Campaign not found",
         ) from error
+    except PolicyViolationError as error:
+        raise _policy_violation(error) from error
 
 
 @router.get("/{campaign_id}/kill-switch/latest", response_model=KillSwitchResult)
@@ -224,6 +230,8 @@ async def approve_campaign_action(
             status_code=status.HTTP_409_CONFLICT,
             detail="Action is not pending approval",
         ) from error
+    except PolicyViolationError as error:
+        raise _policy_violation(error) from error
 
 
 @router.post("/{campaign_id}/actions/{action_id}/reject", response_model=CampaignProposal)
@@ -250,6 +258,8 @@ async def reject_campaign_action(
             status_code=status.HTTP_409_CONFLICT,
             detail="Action is not pending approval",
         ) from error
+    except PolicyViolationError as error:
+        raise _policy_violation(error) from error
 
 
 @router.get("/{campaign_id}/performance", response_model=MediaPerformanceResponse)
@@ -285,3 +295,7 @@ async def list_campaign_audit(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Campaign not found",
         ) from error
+
+
+def _policy_violation(error: PolicyViolationError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error))

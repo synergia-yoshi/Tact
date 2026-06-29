@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
@@ -21,7 +22,7 @@ class AuthContext:
 
     @classmethod
     def dev(cls) -> AuthContext:
-        return cls(actor_id="dev-user", org_id="dev-org")
+        return cls(actor_id="dev-user", org_id="dev-org", roles=("admin",))
 
 
 def create_signed_auth_token(
@@ -30,11 +31,16 @@ def create_signed_auth_token(
     actor_id: str,
     org_id: str,
     roles: list[str] | None = None,
+    expires_at: datetime | None = None,
 ) -> str:
+    expires_at = expires_at or datetime.now(UTC) + timedelta(hours=1)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
     payload = {
         "sub": actor_id,
         "org_id": org_id,
         "roles": roles or ["operator"],
+        "exp": int(expires_at.timestamp()),
     }
     payload_b64 = _base64url_encode(json.dumps(payload, sort_keys=True).encode("utf-8"))
     signature = _sign(payload_b64, secret)
@@ -55,12 +61,17 @@ def verify_signed_auth_token(*, token: str, secret: str) -> AuthContext:
     actor_id = payload.get("sub")
     org_id = payload.get("org_id")
     roles = payload.get("roles") or ["operator"]
+    expires_at = payload.get("exp")
     if not isinstance(actor_id, str) or not actor_id:
         raise ValueError("Bearer token is missing sub")
     if not isinstance(org_id, str) or not org_id:
         raise ValueError("Bearer token is missing org_id")
     if not isinstance(roles, list) or not all(isinstance(role, str) for role in roles):
         raise ValueError("Bearer token roles must be a string list")
+    if not isinstance(expires_at, int | float) or isinstance(expires_at, bool):
+        raise ValueError("Bearer token is missing exp")
+    if datetime.now(UTC).timestamp() >= expires_at:
+        raise ValueError("Bearer token has expired")
     return AuthContext(actor_id=actor_id, org_id=org_id, roles=tuple(roles))
 
 

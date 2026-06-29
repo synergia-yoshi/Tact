@@ -20,6 +20,7 @@ from app.models.campaign import AgentAction, CampaignBrief, CampaignProposal, Cr
 from app.models.kill_switch import KillSwitchResult
 from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSnapshot
+from app.policy import ensure_allowed
 from app.repositories import AuditRepository, CampaignRepository
 
 
@@ -219,6 +220,7 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> CampaignProposal:
         auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "publish.approve")
         campaign = self.get_campaign(campaign_id, auth_context)
         action = self._get_action(campaign, action_id)
         if action.approval_status != "pending_approval":
@@ -268,6 +270,7 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> CampaignProposal:
         auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "publish.reject")
         campaign = self.get_campaign(campaign_id, auth_context)
         action = self._get_action(campaign, action_id)
         if action.approval_status != "pending_approval":
@@ -415,6 +418,7 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> KillSwitchResult:
         auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "kill_switch.evaluate")
         campaign = self.get_campaign(campaign_id, auth_context)
         if campaign.publish_result is None:
             result = KillSwitchResult(
@@ -492,7 +496,12 @@ class CampaignService:
             org_id=auth_context.org_id,
         )
 
-    def verify_audit(self) -> AuditVerificationResult:
+    def verify_audit(
+        self,
+        auth_context: AuthContext | None = None,
+    ) -> AuditVerificationResult:
+        auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "audit.verify")
         return self._audit_repository.verify()
 
     def _creative_from_llm(self, content: str, brief: CampaignBrief) -> CreativeDraft:
