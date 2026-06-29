@@ -7,6 +7,7 @@ from app.auth import create_signed_auth_token
 from app.config import get_settings
 from app.dependencies import (
     get_llm_adapter,
+    get_measurement_adapter,
     get_media_adapter,
     get_repository_bundle,
     get_secret_resolver,
@@ -99,4 +100,5 @@ def _clear_dependency_caches() -> None:
     get_repository_bundle.cache_clear()
     get_llm_adapter.cache_clear()
     get_media_adapter.cache_clear()
+    get_measurement_adapter.cache_clear()
     get_secret_resolver.cache_clear()

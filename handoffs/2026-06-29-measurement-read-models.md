@@ -1,4 +1,4 @@
-# Tact Handoff
+# 2026-06-29 Measurement Read Models Snapshot
 
 ## 1. 対象の実体
 

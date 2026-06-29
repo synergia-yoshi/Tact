@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from app.adapters.llm import LLMAdapter, LLMChatRequest, LLMMessage
+from app.adapters.measurement import MeasurementAdapter, MeasurementReadRequest
 from app.adapters.media import (
     MediaAdapter,
     MediaPerformanceRequest,
@@ -14,6 +15,7 @@ from app.auth import AuthContext
 from app.config import Settings
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import AgentAction, CampaignBrief, CampaignProposal, CreativeDraft
+from app.models.measurement import MetricSnapshot
 from app.repositories import AuditRepository, CampaignRepository
 
 
@@ -22,6 +24,10 @@ class CampaignNotFoundError(LookupError):
 
 
 class CampaignNotPublishedError(RuntimeError):
+    pass
+
+
+class CampaignMeasurementRequiredError(RuntimeError):
     pass
 
 
@@ -40,12 +46,14 @@ class CampaignService:
         settings: Settings,
         llm_adapter: LLMAdapter,
         media_adapter: MediaAdapter,
+        measurement_adapter: MeasurementAdapter,
         repository: CampaignRepository,
         audit_repository: AuditRepository,
     ) -> None:
         self._settings = settings
         self._llm_adapter = llm_adapter
         self._media_adapter = media_adapter
+        self._measurement_adapter = measurement_adapter
         self._repository = repository
         self._audit_repository = audit_repository
 
@@ -155,6 +163,8 @@ class CampaignService:
         campaign = self.get_campaign(campaign_id, auth_context)
         if campaign.publish_result is not None:
             return campaign
+        if not campaign.metric_snapshots:
+            raise CampaignMeasurementRequiredError(campaign_id)
         if self._find_pending_publish_action(campaign) is not None:
             return campaign
 
@@ -284,6 +294,58 @@ class CampaignService:
                 external_campaign_id=campaign.publish_result.external_campaign_id,
             )
         )
+
+    async def refresh_measurements(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> MetricSnapshot:
+        auth_context = auth_context or AuthContext.dev()
+        campaign = self.get_campaign(campaign_id, auth_context)
+        snapshot = await self._measurement_adapter.fetch_snapshot(
+            MeasurementReadRequest(
+                org_id=auth_context.org_id,
+                campaign_id=campaign.id,
+                campaign_name=campaign.brief.name,
+                total_budget_jpy=campaign.brief.total_budget_jpy,
+            )
+        )
+        campaign.metric_snapshots.append(snapshot)
+        self._repository.save(campaign)
+        self._audit_repository.append(
+            event_type="campaign.measurement.refreshed",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
+            subject_type="campaign",
+            subject_id=campaign.id,
+            summary="Read-only GA4/Shopify measurement snapshot refreshed before publish.",
+            payload={
+                "snapshot_id": snapshot.id,
+                "source": snapshot.source,
+                "data_kind": snapshot.data_kind,
+            },
+            guardrail_result={
+                "status": "passed",
+                "checks": [
+                    {
+                        "name": "measurement_before_publish",
+                        "result": "passed",
+                        "message": "Measurement snapshot exists before publish approval.",
+                    }
+                ],
+            },
+        )
+        return snapshot
+
+    def latest_measurement(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext | None = None,
+    ) -> MetricSnapshot | None:
+        campaign = self.get_campaign(campaign_id, auth_context)
+        if not campaign.metric_snapshots:
+            return None
+        return campaign.metric_snapshots[-1]
 
     def list_campaign_audit(
         self,

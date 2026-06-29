@@ -118,6 +118,23 @@ def test_publish_requires_approval_then_fetches_performance() -> None:
 
     publish_response = client.post(f"/api/v1/campaigns/{campaign_id}/publish")
 
+    assert publish_response.status_code == 409
+    assert publish_response.json()["detail"] == (
+        "Measurement snapshot required before publish approval can be requested"
+    )
+
+    measurement_response = client.post(
+        f"/api/v1/campaigns/{campaign_id}/measurements/refresh"
+    )
+
+    assert measurement_response.status_code == 200
+    measurement = measurement_response.json()
+    assert measurement["source"] == "ga4_shopify_mock"
+    assert measurement["data_kind"] == "simulated"
+    assert measurement["labels"]["roas"] == "simulated"
+
+    publish_response = client.post(f"/api/v1/campaigns/{campaign_id}/publish")
+
     assert publish_response.status_code == 200
     pending = publish_response.json()
     assert pending["status"] == "draft"
@@ -163,6 +180,7 @@ def test_publish_requires_approval_then_fetches_performance() -> None:
     assert audit_response.status_code == 200
     assert [entry["event_type"] for entry in audit_response.json()] == [
         "campaign.proposal.created",
+        "campaign.measurement.refreshed",
         "campaign.publish.requested",
         "campaign.publish.approved",
     ]
