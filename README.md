@@ -11,8 +11,10 @@ explicit assumptions:
   the mock implementations later without changing service code.
 - Secrets are loaded only from server-side environment variables or `.env`.
   They are never committed and are not returned from public API responses.
-- The polished product UI is served by FastAPI as static HTML/CSS/JS from
-  `app/web`, using `design-reference.html` as the visual source of truth.
+- The polished product UI uses Vite + TypeScript source under `app/web/src`,
+  with built assets served by FastAPI from `app/web/dist`.
+- `design-reference.html` is a read-only visual source of truth; implementation
+  changes should be reviewed against it instead of editing the reference.
 
 ## Local setup
 
@@ -20,8 +22,16 @@ explicit assumptions:
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -e ".[dev]"
+npm install
+npm run build
 cp .env.example .env
 python3 -m uvicorn app.main:app --reload
+```
+
+For the browser UI in development, run Vite separately:
+
+```bash
+npm run dev
 ```
 
 ## Test
@@ -29,13 +39,17 @@ python3 -m uvicorn app.main:app --reload
 ```bash
 python3 -m pytest
 python3 -m ruff check .
+npm run test
+npm run test:e2e
 ```
 
 ## API overview
 
-- `GET /` - serve the Tact UI shell.
-- `GET /static/*` - serve UI assets bundled with the FastAPI package.
+- `GET /` - serve the built Tact UI.
+- `GET /static/*` - serve built Vite UI assets bundled with the FastAPI package.
 - `GET /health` - service health and active adapter kinds.
+- `POST /api/v1/auth/dev-token` - mint a local-only signed bearer token for
+  operator/approver/admin UI testing; rejected in production.
 - `POST /api/v1/campaigns/proposals` - create a campaign proposal from a brief.
 - `GET /api/v1/campaigns` - list stored campaign proposals.
 - `GET /api/v1/campaigns/{campaign_id}` - fetch a campaign proposal.
@@ -75,7 +89,8 @@ Example proposal request:
   "total_budget_jpy": 300000,
   "channels": ["search", "social"],
   "kpis": ["qualified_leads", "cost_per_lead"],
-  "tone": "confident and concise"
+  "tone": "confident and concise",
+  "autonomy_level": "approval_only"
 }
 ```
 
@@ -101,6 +116,9 @@ Example proposal request:
   production guard, and a reusable role policy matrix.
 - Milestone 10: UI design-system shell based on `design-reference.html`, with
   six navigation screens, responsive layout, and honest pre-API labels.
+- Milestone 11: Vite + TypeScript UI stack, seven navigation screens including
+  Dashboard, signed-bearer dev token flow, and a real API vertical slice from
+  proposal creation through gated publish approval to dashboard and audit.
 
 ## Persistence and secrets
 
@@ -158,6 +176,12 @@ and ignores spoofable tenant headers such as `x-tact-org`.
 `AUTH_MODE=disabled`. Local disabled auth maps to an admin-only development
 context so the MVP remains easy to exercise without production risk.
 
+Local UI review can request short-lived signed tokens through
+`POST /api/v1/auth/dev-token`. This endpoint is intentionally local-only and
+returns 403 in production. It exists so the Vite UI can exercise operator,
+approver, and admin role boundaries without introducing a production issuer in
+this milestone.
+
 Role-gated operations use the shared policy matrix in `app/policy.py`:
 
 - `approver` or `admin`: approve/reject pending publish actions and future
@@ -193,8 +217,14 @@ Role-gated operations use the shared policy matrix in `app/policy.py`:
 - [x] Production cannot boot with `AUTH_MODE=disabled`.
 - [x] Signed bearer tokens require `exp` and expired tokens are rejected.
 - [x] Publish approval and audit verification are role-gated by policy matrix.
-- [x] UI shell is served from `/` with six button-based navigation screens.
-- [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
+- [x] UI is served from `/` with seven button-based navigation screens.
+- [x] Dashboard is a first-class view with Chart.js-backed campaign metrics.
+- [x] Home -> proposal -> measurement/legal gate -> pending approval ->
+  approver/admin approval -> dashboard is covered by Playwright E2E.
+- [x] Server-derived strings rendered via HTML templates are escaped, with an
+  XSS-focused unit test.
+- [x] `python3 -m pytest`, `python3 -m ruff check .`, `npm run test`, and
+  `npm run test:e2e` pass.
 
 ## Remaining assumptions
 
