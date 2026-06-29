@@ -44,6 +44,7 @@
           </div>
           <div class="topbar-actions">
             <div class="role-switcher" id="role-switcher" aria-label="権限切替" hidden>
+              <button type="button" class="role-button" data-role="viewer">閲覧者</button>
               <button type="button" class="role-button active" data-role="operator">担当者</button>
               <button type="button" class="role-button" data-role="approver">承認者</button>
               <button type="button" class="role-button" data-role="admin">管理者</button>
@@ -172,6 +173,17 @@
             <button class="btn ghost" type="button" id="verify-audit-button">記録を検証</button>
           </div>
           <div id="audit-content"></div>
+        </section>
+
+        <section class="view" id="view-roles" aria-labelledby="roles-title">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">管理面</p>
+              <h2 id="roles-title">ロール管理</h2>
+            </div>
+            <span class="status-pill neutral">管理者のみ</span>
+          </div>
+          <div id="roles-content"></div>
         </section>
 
         <section class="view" id="view-settings" aria-labelledby="settings-title">

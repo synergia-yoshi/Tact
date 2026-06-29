@@ -908,6 +908,10 @@ input[type="range"] {
   grid-column: 1 / -1;
 }
 
+.customer-home-summary {
+  margin-bottom: 18px;
+}
+
 .setting-head {
   display: flex;
   align-items: flex-start;
@@ -990,6 +994,35 @@ input[type="range"] {
 
 .card-action {
   margin-top: 14px;
+}
+
+.role-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.role-card .setting-head {
+  margin-bottom: 14px;
+}
+
+.role-choice-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 4px;
+  background: var(--surface2);
+}
+
+.role-choice-row .segment-button {
+  min-height: 38px;
+  background: var(--wh);
+}
+
+.role-choice-row .segment-button.active {
+  background: var(--bl);
 }
 
 .out {
@@ -1708,6 +1741,7 @@ code {
   .agent-progress-grid,
   .dash-top,
   .dashboard-grid,
+  .role-admin-grid,
   .settings-grid {
     grid-template-columns: 1fr;
   }

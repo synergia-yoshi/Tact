@@ -64,9 +64,8 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
     page.locator("#view-tasks .approval-item .data-label").getByText("確認待ち"),
   ).toBeVisible();
   await expect(page.locator("#view-tasks .generation-step.complete")).toHaveCount(5);
-
-  await page.getByRole("button", { name: "広告を出すことを承認" }).click();
-  await expect(page.getByText("この操作を実行する権限がありません")).toBeVisible();
+  await expect(page.getByRole("button", { name: "広告を出すことを承認" })).toHaveCount(0);
+  await expect(page.getByText("承認者・管理者のみ")).toBeVisible();
 
   await page.getByRole("button", { name: "承認者" }).click();
   await page.getByRole("button", { name: "広告を出すことを承認" }).click();
@@ -109,6 +108,9 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
 
   await page.locator("[data-kill-stop]").click();
   await expect(page.locator(".kill-panel").getByText("停止想定")).toBeVisible();
+  await expect(page.getByRole("button", { name: "広告素材" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "設定" })).toHaveCount(0);
+  await page.getByRole("button", { name: "管理者" }).click();
   await page.getByRole("button", { name: "記録" }).click();
   await expect(
     page.locator("#audit-content .data-label").getByText("止める想定を確認", { exact: true }),
@@ -155,6 +157,8 @@ test("settings shows honest data integration status and admin-only connection pa
 }) => {
   await page.goto("/");
 
+  await expect(page.getByRole("button", { name: "設定" })).toHaveCount(0);
+  await page.getByRole("button", { name: "管理者" }).click();
   await page.getByRole("button", { name: "設定" }).click();
   await expect(page.getByRole("heading", { name: "データ連携" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "計測・解析" })).toBeVisible();
@@ -188,9 +192,7 @@ test("settings shows honest data integration status and admin-only connection pa
   await expect(page.locator('[data-integration-status="coming_soon"]')).toHaveCount(15);
   await expect(page.locator("[data-integration-connect]")).toHaveCount(3);
   await expect(page.getByText("接続済み")).toHaveCount(0);
-  await expect(page.locator("[data-integration-connect]").first()).toBeDisabled();
 
-  await page.getByRole("button", { name: "管理者" }).click();
   const firstConnectButton = page.locator("[data-integration-connect]").first();
   await expect(firstConnectButton).toBeEnabled();
   await firstConnectButton.click();

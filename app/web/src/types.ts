@@ -1,4 +1,4 @@
-export type Role = "operator" | "approver" | "admin";
+export type Role = "viewer" | "operator" | "approver" | "admin";
 export type RouteName =
   | "home"
   | "campaigns"
@@ -6,6 +6,7 @@ export type RouteName =
   | "tasks"
   | "creative"
   | "audit"
+  | "roles"
   | "settings";
 export type AutonomyLevel = "full_auto" | "approval_only" | "guided";
 export type DataKind = "measured" | "simulated";
@@ -232,6 +233,14 @@ export interface DevTokenResponse {
   roles: Role[];
   expires_at: string | null;
   auth_mode: string;
+}
+
+export interface RoleAssignment {
+  actor_id: string;
+  display_name: string;
+  roles: Role[];
+  surface: string;
+  updated_at: string;
 }
 
 export interface UiError {

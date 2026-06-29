@@ -30,8 +30,36 @@ from app.models.dashboard import (
 from app.models.kill_switch import KillSwitchResult
 from app.models.legal import LegalCheckResult
 from app.models.measurement import MetricSeriesPoint, MetricSnapshot
+from app.models.roles import RoleAssignment, RoleAssignmentUpdate
 from app.policy import ensure_allowed
 from app.repositories import AuditRepository, CampaignRepository
+
+ROLE_ASSIGNMENTS: dict[str, RoleAssignment] = {
+    "client-viewer": RoleAssignment(
+        actor_id="client-viewer",
+        display_name="閲覧者",
+        roles=["viewer"],
+        surface="顧客面",
+    ),
+    "client-approver": RoleAssignment(
+        actor_id="client-approver",
+        display_name="承認者",
+        roles=["approver"],
+        surface="顧客面",
+    ),
+    "ops-operator": RoleAssignment(
+        actor_id="ops-operator",
+        display_name="運用担当",
+        roles=["operator"],
+        surface="運用面",
+    ),
+    "admin": RoleAssignment(
+        actor_id="admin",
+        display_name="管理者",
+        roles=["admin"],
+        surface="管理面",
+    ),
+}
 
 
 class CampaignNotFoundError(LookupError):
@@ -82,6 +110,7 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> CampaignProposal:
         auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "campaign.create")
         llm_response = await self._llm_adapter.create_chat_completion(
             LLMChatRequest(
                 model=self._settings.mock_llm_model,
@@ -163,14 +192,19 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> CampaignProposal:
         auth_context = auth_context or AuthContext.dev()
-        campaign = self._repository.get(campaign_id, org_id=auth_context.org_id)
-        if campaign is None:
-            raise CampaignNotFoundError(campaign_id)
-        return campaign
+        ensure_allowed(auth_context, "campaign.read")
+        return self._scope_campaign_for_read(
+            self._get_campaign_raw(campaign_id, auth_context),
+            auth_context,
+        )
 
     def list_campaigns(self, auth_context: AuthContext | None = None) -> list[CampaignProposal]:
         auth_context = auth_context or AuthContext.dev()
-        return self._repository.list(org_id=auth_context.org_id)
+        ensure_allowed(auth_context, "campaign.read")
+        return [
+            self._scope_campaign_for_read(campaign, auth_context)
+            for campaign in self._repository.list(org_id=auth_context.org_id)
+        ]
 
     def get_dashboard(
         self,
@@ -181,7 +215,8 @@ class CampaignService:
         channel_filter: DashboardChannelFilter = "all",
     ) -> CampaignDashboard:
         auth_context = auth_context or AuthContext.dev()
-        campaign = self.get_campaign(campaign_id, auth_context)
+        ensure_allowed(auth_context, "dashboard.read")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         metric = self.latest_measurement(campaign_id, auth_context)
         channel_rows = self._dashboard_channel_rows(campaign, metric, period)
         if channel_filter != "all":
@@ -204,7 +239,8 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> CampaignProposal:
         auth_context = auth_context or AuthContext.dev()
-        campaign = self.get_campaign(campaign_id, auth_context)
+        ensure_allowed(auth_context, "campaign.operate")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         if campaign.publish_result is not None:
             return campaign
         if not campaign.metric_snapshots:
@@ -256,7 +292,7 @@ class CampaignService:
     ) -> CampaignProposal:
         auth_context = auth_context or AuthContext.dev()
         ensure_allowed(auth_context, "publish.approve")
-        campaign = self.get_campaign(campaign_id, auth_context)
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         action = self._get_action(campaign, action_id)
         if action.approval_status != "pending_approval":
             raise AgentActionNotPendingError(action_id)
@@ -306,7 +342,7 @@ class CampaignService:
     ) -> CampaignProposal:
         auth_context = auth_context or AuthContext.dev()
         ensure_allowed(auth_context, "publish.reject")
-        campaign = self.get_campaign(campaign_id, auth_context)
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         action = self._get_action(campaign, action_id)
         if action.approval_status != "pending_approval":
             raise AgentActionNotPendingError(action_id)
@@ -332,7 +368,9 @@ class CampaignService:
         campaign_id: str,
         auth_context: AuthContext | None = None,
     ) -> MediaPerformanceResponse:
-        campaign = self.get_campaign(campaign_id, auth_context)
+        auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "dashboard.read")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         if campaign.publish_result is None:
             raise CampaignNotPublishedError(campaign_id)
 
@@ -349,7 +387,8 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> MetricSnapshot:
         auth_context = auth_context or AuthContext.dev()
-        campaign = self.get_campaign(campaign_id, auth_context)
+        ensure_allowed(auth_context, "campaign.operate")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         snapshot = await self._measurement_adapter.fetch_snapshot(
             MeasurementReadRequest(
                 org_id=auth_context.org_id,
@@ -390,7 +429,9 @@ class CampaignService:
         campaign_id: str,
         auth_context: AuthContext | None = None,
     ) -> MetricSnapshot | None:
-        campaign = self.get_campaign(campaign_id, auth_context)
+        auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "dashboard.read")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         if not campaign.metric_snapshots:
             return None
         return campaign.metric_snapshots[-1]
@@ -401,7 +442,8 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> LegalCheckResult:
         auth_context = auth_context or AuthContext.dev()
-        campaign = self.get_campaign(campaign_id, auth_context)
+        ensure_allowed(auth_context, "campaign.operate")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         result = run_rule_based_legal_check(
             texts=[
                 campaign.creative.headline,
@@ -442,7 +484,9 @@ class CampaignService:
         campaign_id: str,
         auth_context: AuthContext | None = None,
     ) -> LegalCheckResult | None:
-        campaign = self.get_campaign(campaign_id, auth_context)
+        auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "dashboard.read")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         if not campaign.legal_checks:
             return None
         return campaign.legal_checks[-1]
@@ -454,7 +498,7 @@ class CampaignService:
     ) -> KillSwitchResult:
         auth_context = auth_context or AuthContext.dev()
         ensure_allowed(auth_context, "kill_switch.evaluate")
-        campaign = self.get_campaign(campaign_id, auth_context)
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         if campaign.publish_result is None:
             result = KillSwitchResult(
                 status="clear",
@@ -515,7 +559,7 @@ class CampaignService:
     ) -> KillSwitchResult:
         auth_context = auth_context or AuthContext.dev()
         ensure_allowed(auth_context, "kill_switch.stop")
-        campaign = self.get_campaign(campaign_id, auth_context)
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         if campaign.publish_result is None:
             result = KillSwitchResult(
                 status="clear",
@@ -585,7 +629,9 @@ class CampaignService:
         campaign_id: str,
         auth_context: AuthContext | None = None,
     ) -> KillSwitchResult | None:
-        campaign = self.get_campaign(campaign_id, auth_context)
+        auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "dashboard.read")
+        campaign = self._get_campaign_raw(campaign_id, auth_context)
         if not campaign.kill_switch_results:
             return None
         return campaign.kill_switch_results[-1]
@@ -596,7 +642,8 @@ class CampaignService:
         auth_context: AuthContext | None = None,
     ) -> list[AuditEntry]:
         auth_context = auth_context or AuthContext.dev()
-        self.get_campaign(campaign_id, auth_context)
+        ensure_allowed(auth_context, "audit.read")
+        self._get_campaign_raw(campaign_id, auth_context)
         return self._audit_repository.list_for_subject(
             "campaign",
             campaign_id,
@@ -610,6 +657,104 @@ class CampaignService:
         auth_context = auth_context or AuthContext.dev()
         ensure_allowed(auth_context, "audit.verify")
         return self._audit_repository.verify()
+
+    def list_role_assignments(
+        self,
+        auth_context: AuthContext | None = None,
+    ) -> list[RoleAssignment]:
+        auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "role.manage")
+        return [assignment.model_copy(deep=True) for assignment in ROLE_ASSIGNMENTS.values()]
+
+    def update_role_assignment(
+        self,
+        actor_id: str,
+        update: RoleAssignmentUpdate,
+        auth_context: AuthContext | None = None,
+    ) -> RoleAssignment:
+        auth_context = auth_context or AuthContext.dev()
+        ensure_allowed(auth_context, "role.manage")
+        previous = ROLE_ASSIGNMENTS.get(actor_id) or RoleAssignment(
+            actor_id=actor_id,
+            display_name=actor_id,
+            roles=["viewer"],
+            surface="顧客面",
+        )
+        next_assignment = previous.model_copy(
+            update={
+                "roles": update.roles,
+                "surface": self._surface_for_roles(update.roles),
+                "updated_at": datetime.now(tz=UTC),
+            }
+        )
+        ROLE_ASSIGNMENTS[actor_id] = next_assignment
+        self._audit_repository.append(
+            event_type="role.assignment.updated",
+            org_id=auth_context.org_id,
+            actor=auth_context.actor_id,
+            subject_type="role_assignment",
+            subject_id=actor_id,
+            summary="ロール管理の変更を保存しました。",
+            payload={
+                "actor_id": actor_id,
+                "roles": list(next_assignment.roles),
+            },
+            diff={"roles": {"from": list(previous.roles), "to": list(next_assignment.roles)}},
+            guardrail_result={
+                "status": "passed",
+                "checks": [
+                    {
+                        "name": "admin_role_management",
+                        "result": "passed",
+                        "message": "ロール変更は管理者だけが実行できます。",
+                    }
+                ],
+            },
+        )
+        return next_assignment.model_copy(deep=True)
+
+    def _get_campaign_raw(
+        self,
+        campaign_id: str,
+        auth_context: AuthContext,
+    ) -> CampaignProposal:
+        campaign = self._repository.get(campaign_id, org_id=auth_context.org_id)
+        if campaign is None:
+            raise CampaignNotFoundError(campaign_id)
+        return campaign
+
+    def _scope_campaign_for_read(
+        self,
+        campaign: CampaignProposal,
+        auth_context: AuthContext,
+    ) -> CampaignProposal:
+        roles = set(auth_context.roles)
+        if roles.intersection({"operator", "admin"}):
+            return campaign
+        scoped = campaign.model_copy(deep=True)
+        scoped.media_plan = scoped.media_plan.model_copy(
+            update={"request_id": "redacted", "account_id": "redacted"}
+        )
+        for placement in scoped.media_plan.placements:
+            placement.targeting = {}
+            placement.creative_spec = {}
+        for action in scoped.actions:
+            action.payload = {}
+            action.guardrail_result = {
+                "status": action.guardrail_result.get("status", "requires_approval")
+                if isinstance(action.guardrail_result, dict)
+                else "requires_approval"
+            }
+            action.execution_result = None
+        return scoped
+
+    def _surface_for_roles(self, roles: list[str]) -> str:
+        role_set = set(roles)
+        if "admin" in role_set:
+            return "管理面"
+        if "operator" in role_set:
+            return "運用面"
+        return "顧客面"
 
     def _dashboard_kpis(
         self,

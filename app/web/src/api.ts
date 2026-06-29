@@ -10,6 +10,7 @@ import type {
   KillSwitchResult,
   MetricSnapshot,
   Role,
+  RoleAssignment,
   UiError,
 } from "./types";
 
@@ -134,5 +135,14 @@ export const api = {
   },
   verifyAudit(): Promise<AuditVerificationResult> {
     return requestJson<AuditVerificationResult>("/api/v1/campaigns/audit/verify");
+  },
+  listRoles(): Promise<RoleAssignment[]> {
+    return requestJson<RoleAssignment[]>("/api/v1/roles");
+  },
+  updateRole(actorId: string, roles: Role[]): Promise<RoleAssignment> {
+    return requestJson<RoleAssignment>(`/api/v1/roles/${encodeURIComponent(actorId)}`, {
+      method: "POST",
+      body: JSON.stringify({ roles }),
+    });
   },
 };
