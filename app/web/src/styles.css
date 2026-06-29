@@ -823,6 +823,15 @@ input[type="range"] {
   font-style: normal;
 }
 
+.policy-note {
+  margin: 10px 0 0;
+  border-left: 3px solid var(--bl);
+  padding-left: 10px;
+  color: var(--tx2);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .action-row {
   justify-content: space-between;
   margin-top: 18px;
@@ -887,6 +896,68 @@ input[type="range"] {
   margin-bottom: 0;
   color: var(--tx2);
   font-size: 13px;
+}
+
+.settings-wide {
+  grid-column: 1 / -1;
+}
+
+.setting-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.setting-head h3 {
+  margin-top: 0;
+}
+
+.setting-note {
+  margin-top: 14px;
+}
+
+.integration-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.integration-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--bd);
+  padding-top: 12px;
+}
+
+.integration-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.integration-meta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.integration-meta strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.integration-meta span {
+  color: var(--tx2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.integration-action {
+  min-width: 92px;
+  padding: 8px 11px;
+  font-size: 12px;
 }
 
 .card-action {
@@ -1401,8 +1472,18 @@ code {
   }
 
   .approval-item,
-  .audit-card {
+  .audit-card,
+  .integration-row,
+  .setting-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .integration-row {
+    display: flex;
+  }
+
+  .setting-head {
+    display: flex;
   }
 }

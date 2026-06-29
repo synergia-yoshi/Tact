@@ -9,6 +9,20 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   await expect(page.getByRole("button", { name: "成果" })).toBeVisible();
   await expect(page.getByText("安全な確認モード")).toBeVisible();
   await expect(page.locator("#generation-stepper-content").getByText("宣伝内容の入力")).toBeVisible();
+  await expect(page.getByText("費用対効果を最大化")).toBeVisible();
+  await expect(page.getByText("費用を抑える")).toHaveCount(0);
+  await expect(page.locator(".choice-card")).toHaveCount(2);
+  await expect(page.getByText("おまかせ")).toBeVisible();
+  await expect(page.getByText("一緒に")).toBeVisible();
+  await expect(page.getByText("全部まかせる")).toHaveCount(0);
+  await expect(page.getByText("どちらを選んでも、広告を出す前・予算変更は必ず人が確認します。")).toBeVisible();
+
+  await page.locator("#budget-range").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "500";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator("#budget-value")).toHaveText("¥5,000,000");
 
   const proposalResponsePromise = page.waitForResponse(
     (response) =>
@@ -17,6 +31,12 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   );
   await page.getByRole("button", { name: /広告案を作成する/ }).click();
   const proposal = await proposalResponsePromise.then((response) => response.json());
+  expect(proposal.brief.total_budget_jpy).toBe(5_000_000);
+  const allocatedBudget = proposal.media_plan.placements.reduce(
+    (total: number, placement: { budget_jpy: number }) => total + placement.budget_jpy,
+    0,
+  );
+  expect(allocatedBudget).toBe(5_000_000);
   await expect(page.locator("#creative-title")).toBeVisible();
   const creativeView = page.locator("#view-creative");
   await expect(creativeView.getByText("テスト用の案 / 広告文")).toBeVisible();
@@ -90,4 +110,25 @@ test("create proposal disables the submit button while the request is in flight"
   await expect(page.locator("#generation-stepper-content .generation-status").first()).toHaveText("進行中");
   await expect(page.locator("#creative-title")).toBeVisible();
   expect(createCalls).toBe(1);
+});
+
+test("settings shows honest data integration status and admin-only connection path", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "設定" }).click();
+  await expect(page.getByRole("heading", { name: "データ連携" })).toBeVisible();
+  await expect(page.getByText("Googleアナリティクス（GA4）")).toBeVisible();
+  await expect(page.getByText("Shopify")).toBeVisible();
+  await expect(page.getByText("Google広告")).toBeVisible();
+  await expect(page.locator('[data-integration-status="test"]')).toHaveCount(3);
+  await expect(page.getByText("接続済み")).toHaveCount(0);
+  await expect(page.locator("[data-integration-connect]").first()).toBeDisabled();
+
+  await page.getByRole("button", { name: "管理者" }).click();
+  const firstConnectButton = page.locator("[data-integration-connect]").first();
+  await expect(firstConnectButton).toBeEnabled();
+  await firstConnectButton.click();
+  await expect(page.getByText("APIキーはこの画面では扱いません")).toBeVisible();
 });

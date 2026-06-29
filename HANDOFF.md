@@ -64,6 +64,20 @@ responses or explicit in-flight API phases.
 - Added "入力に戻る" and "別案を作る" controls. They do not mutate server
   state; retry only restores the prior brief into the form so a new proposal can
   be requested.
+- MS3.5 product refinements implemented:
+  - Monthly budget slider now supports `¥100,000` to `¥5,000,000` in
+    `¥100,000` steps while preserving `total_budget_jpy = value * 10000`.
+  - The `efficiency` objective label is now `費用対効果を最大化`; the backend key
+    remains `efficiency`.
+  - Automation choice UI is now two options: `おまかせ` (`approval_only`) and
+    `一緒に` (`guided`). Legacy `full_auto` can still exist in the enum/API but
+    is not exposed in the UI; retrying an old `full_auto` campaign falls back to
+    `approval_only`.
+  - The rule `広告を出す前・予算変更は必ず人が確認` is shown as a fixed policy note,
+    not as one selectable mode.
+  - Settings now includes a `データ連携` section for GA4, Shopify, and Google広告.
+    Current dev/mock rows are labeled `テスト用`, connection buttons are
+    admin-only, and no API key input/storage/display was added.
 - Rebuilt committed FastAPI-served assets in `app/web/dist`.
 - Existing MS2.5 behavior remains:
   loading/disabled/double-submit guards, partial rendering, stable Chart.js,
@@ -94,8 +108,15 @@ responses or explicit in-flight API phases.
   - Browser copy check on `http://127.0.0.1:8012/` found no visible English
     tokens in generated creative or audit views except the brand/common `Tact`
     / `SNS`.
+  - Budget creation at `¥5,000,000` is covered by E2E and media placement
+    budget allocation sums exactly to the submitted total.
+  - Settings shows GA4 / Shopify / Google広告 as `テスト用`; non-admin connection
+    buttons are disabled, admin sees the connection path, and the UI does not
+    display `接続済み` for mock/test integrations.
 - Still mock/simulated:
   - GA4/Shopify read model is the existing mock adapter.
+  - The new Settings data-integration rows are status/UX only; real OAuth and
+    backend connection state are future work.
   - LLM creative output is the mock LLM adapter.
   - Media planning/publish is mock media.
   - Kill Switch text states simulation/no real stop.
@@ -118,6 +139,8 @@ responses or explicit in-flight API phases.
   - chart canvas remains stable across role switching
   - audit verify is admin-only and formatted
   - proposal submit is disabled while the request is in flight
+  - MS3.5 budget upper bound, two automation choices, old copy removal, and
+    settings data-integration state are covered
 - `npm run build` passed as part of `npm run test:e2e` and refreshed
   `app/web/dist`.
 - `.\.venv312\Scripts\python.exe -m pytest` passed: 38 tests.
@@ -129,6 +152,11 @@ responses or explicit in-flight API phases.
 - Hero revert smoke passed on `http://127.0.0.1:8012/`: original
   `3問で開始` / `広告づくりを、3問から。` hero visible again and the experimental
   `マーケの作業を、AIで下書き。` headline absent.
+- MS3.5 browser smoke passed on `http://127.0.0.1:8012/`:
+  home budget attributes are `min=10 max=500 step=10`, old goal/automation copy
+  is absent, settings integration rows are `テスト用`, admin-only connection path
+  shows a server-side OAuth/API-key warning, and a 390x844 mobile viewport has
+  no horizontal overflow on the changed home/settings areas.
 - Visual SSoT smoke passed:
   - `rg` found no `--grad`, `#5b4ff0`, `#6d5cf5`, `rgba(76, 72, 210, ...)`, or
     `rgba(109, 92, 245, ...)` in `app/web/src/styles.css` or `app/web/dist`.
@@ -144,6 +172,8 @@ responses or explicit in-flight API phases.
 - PR #13 is the active draft follow-up PR for this branch.
 - The experimental hero copy was reverted after owner feedback; future
   copy/voice changes should stay proposal-only unless explicitly approved.
+- The MS3.5 §5 copy/voice proposal was intentionally not implemented; only
+  §1-§4 were treated as approved implementation work.
 - Existing APIs are enough for MS3's honest generation experience. Because
   `createProposal` does not stream intermediate events, media plan and creative
   draft are marked complete only when the server response arrives.
@@ -169,6 +199,8 @@ responses or explicit in-flight API phases.
 5. Continue backend hardening separately:
    Firestore append-only transactions, legal normalization/severity review,
    real GA4/Shopify read adapters, Google Ads OAuth, and scoped real stop/pause.
+6. Review the MS3.5 §5 copy/voice proposal separately before any broader copy
+   rewrite.
 
 ## 7. Awaiting Approval / Decisions
 

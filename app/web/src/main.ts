@@ -38,6 +38,36 @@ let chartSignature: string | null = null;
 let lastFocusedBeforeModal: HTMLElement | null = null;
 const viewSignatures = new Map<string, string>();
 
+type DataIntegrationStatus = "unconnected" | "connected" | "test" | "error";
+
+interface DataIntegration {
+  key: string;
+  name: string;
+  purpose: string;
+  status: DataIntegrationStatus;
+}
+
+const dataIntegrations: DataIntegration[] = [
+  {
+    key: "ga4",
+    name: "Googleアナリティクス（GA4）",
+    purpose: "広告後の訪問数と成果を確認します。",
+    status: "test",
+  },
+  {
+    key: "shopify",
+    name: "Shopify",
+    purpose: "注文数と売上を確認します。",
+    status: "test",
+  },
+  {
+    key: "google_ads",
+    name: "Google広告",
+    purpose: "広告アカウントへの送信先を管理します。",
+    status: "test",
+  },
+];
+
 function el<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (element == null) throw new Error(`Missing element #${id}`);
@@ -187,6 +217,8 @@ function settingsSignature(state: AppState): string {
   return JSON.stringify({
     authMode: state.auth?.auth_mode ?? null,
     devTokenAvailable: state.devTokenAvailable,
+    role: state.role,
+    loading: state.loading?.operation ?? null,
   });
 }
 
@@ -810,8 +842,23 @@ function auditSummary(entry: { event_type: string; summary: string }): string {
 }
 
 function renderSettings(): void {
+  const state = getState();
+  const canManageIntegrations = state.devTokenAvailable === true && state.role === "admin";
   el("settings-content").innerHTML = `
     <div class="settings-grid">
+      <article class="setting-card settings-wide">
+        <div class="setting-head">
+          <div>
+            <h3>データ連携</h3>
+            <p>実データにつなぐ準備画面です。今はテスト用の数字として表示します。</p>
+          </div>
+          <span class="badge amber">APIキー入力なし</span>
+        </div>
+        <div class="integration-list">
+          ${dataIntegrationRows(canManageIntegrations)}
+        </div>
+        <p class="setting-note">接続はサーバー側のOAuthで行います。APIキーや秘密情報はこの画面で入力・保存・表示しません。</p>
+      </article>
       <article class="setting-card">
         <h3>権限</h3>
         <p>担当者、承認者、管理者でできる操作を分けています。広告を出す前は承認者以上が確認します。</p>
@@ -829,6 +876,47 @@ function renderSettings(): void {
       </article>
     </div>
   `;
+}
+
+function dataIntegrationRows(canManageIntegrations: boolean): string {
+  return dataIntegrations
+    .map((integration) => {
+      const disabled = canManageIntegrations ? "" : " disabled";
+      const title = canManageIntegrations
+        ? "接続手順を確認"
+        : "管理者だけが接続できます";
+      return `
+        <div class="integration-row">
+          <div class="integration-meta">
+            <strong>${escapeHtml(integration.name)}</strong>
+            <span>${escapeHtml(integration.purpose)}</span>
+          </div>
+          <span class="badge ${integrationBadgeClass(integration.status)}" data-integration-status="${safeAttr(integration.status)}">${escapeHtml(integrationStatusLabel(integration.status))}</span>
+          <button class="btn ghost integration-action" type="button" data-integration-connect="${safeAttr(integration.key)}" aria-label="${safeAttr(`${integration.name}を${integrationActionLabel(integration.status)}`)}" title="${safeAttr(title)}"${disabled}>${escapeHtml(integrationActionLabel(integration.status))}</button>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function integrationStatusLabel(status: DataIntegrationStatus): string {
+  const labels: Record<DataIntegrationStatus, string> = {
+    unconnected: "未接続",
+    connected: "接続済み",
+    test: "テスト用",
+    error: "エラー",
+  };
+  return labels[status];
+}
+
+function integrationBadgeClass(status: DataIntegrationStatus): string {
+  if (status === "test") return "amber";
+  if (status === "error") return "red";
+  return "";
+}
+
+function integrationActionLabel(status: DataIntegrationStatus): string {
+  return status === "connected" || status === "error" ? "再接続" : "接続する";
 }
 
 async function bootstrap(): Promise<void> {
@@ -859,6 +947,11 @@ function bindEvents(): void {
 
     const autonomy = target.closest<HTMLButtonElement>(".choice-card");
     if (autonomy != null) selectWithin(autonomy, ".choice-card");
+
+    const integrationConnect = target.closest<HTMLButtonElement>("[data-integration-connect]");
+    if (integrationConnect?.dataset.integrationConnect != null) {
+      showIntegrationNotice(integrationConnect.dataset.integrationConnect);
+    }
 
     const selectCampaign = target.closest<HTMLButtonElement>("[data-select-campaign]");
     if (selectCampaign?.dataset.selectCampaign != null) {
@@ -906,19 +999,39 @@ function retryCampaignBrief(campaignId: string): void {
   const campaign = getState().campaigns.find((item) => item.id === campaignId);
   if (campaign == null) return;
   el<HTMLInputElement>("product-input").value = campaign.brief.name;
-  const budgetUnits = Math.max(10, Math.min(100, Math.round(campaign.brief.total_budget_jpy / 10000)));
+  const budgetUnits = Math.max(10, Math.min(500, Math.round(campaign.brief.total_budget_jpy / 10000)));
   el<HTMLInputElement>("budget-range").value = String(budgetUnits);
   el("budget-value").textContent = formatYen(budgetUnits * 10000);
   selectByDataset(".goal-pill", "objective", campaign.brief.objective);
-  selectByDataset(".choice-card", "autonomy", campaign.brief.autonomy_level);
+  selectByDataset(".choice-card", "autonomy", campaign.brief.autonomy_level, "approval_only");
   setRoute("home");
   el<HTMLInputElement>("product-input").focus();
 }
 
-function selectByDataset(selector: string, key: string, value: string): void {
-  const candidates = document.querySelectorAll<HTMLButtonElement>(selector);
+function selectByDataset(selector: string, key: string, value: string, fallbackValue?: string): void {
+  const candidates = Array.from(document.querySelectorAll<HTMLButtonElement>(selector));
+  const targetValue = selector === ".choice-card" && value === "full_auto" ? "approval_only" : value;
+  let matched = false;
   candidates.forEach((button) => {
-    button.classList.toggle("selected", button.dataset[key] === value);
+    const selected = button.dataset[key] === targetValue;
+    if (selected) matched = true;
+    button.classList.toggle("selected", selected);
+  });
+  if (matched || fallbackValue == null) return;
+  candidates.forEach((button) => {
+    button.classList.toggle("selected", button.dataset[key] === fallbackValue);
+  });
+}
+
+function showIntegrationNotice(integrationKey: string): void {
+  const integration = dataIntegrations.find((item) => item.key === integrationKey);
+  if (integration == null) return;
+  setState({
+    error: {
+      status: 0,
+      message: `${integration.name}は今はテスト用です。実接続はサーバー側OAuthで追加します。APIキーはこの画面では扱いません。`,
+      detail: integration.key,
+    },
   });
 }
 

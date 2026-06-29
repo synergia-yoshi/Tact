@@ -52,6 +52,18 @@ do not make the UI look more real than the backend state supports.
   measurement refresh -> legal check -> pending approval request.
 - Added "入力に戻る" and "別案を作る" controls without mutating existing
   server campaign state.
+- MS3.5 product refinements implemented from
+  `2026-06-30-Codex-MS3.5-product-refinements.md` §1-§4:
+  - Budget range now reaches `¥5,000,000` (`min=10 max=500 step=10`).
+  - `efficiency` objective label is `費用対効果を最大化`.
+  - Automation UI is two choices: `おまかせ` (`approval_only`) and `一緒に`
+    (`guided`). `full_auto` remains in the type/API for compatibility but is not
+    shown in the UI.
+  - The human approval rule for publishing/budget changes is a fixed note
+    outside the choices.
+  - Settings has honest `データ連携` rows for GA4 / Shopify / Google広告, all
+    labeled `テスト用` in local/mock mode, with admin-only connection buttons
+    and no API-key input.
 - Updated E2E and API tests for source labels and stepper behavior.
 - Rebuilt `app/web/dist`.
 
@@ -74,12 +86,18 @@ Working:
   the main brand surface.
 - Browser copy check against the local app found no visible English tokens in
   generated creative or audit views except the brand/common `Tact` / `SNS`.
+- Home supports creating a proposal at `¥5,000,000`; E2E confirms the submitted
+  budget and media-placement sum match.
+- Settings shows GA4 / Shopify / Google広告 as `テスト用`, disables connection
+  buttons outside admin, and does not display `接続済み` for mock/test rows.
 
 Still mock/simulated:
 
 - Mock LLM creative output.
 - Mock media planning/publish.
 - Mock GA4/Shopify measurement.
+- Settings data integrations are status/UX only; real OAuth and connection
+  backend are future work.
 - Mock/simulated Kill Switch status.
 - Local dev-token issuer.
 
@@ -87,6 +105,8 @@ Still mock/simulated:
 
 - `npm run test` passed.
 - `npm run test:e2e` passed.
+  - Includes MS3.5 checks for `¥5,000,000` budget submission/media allocation,
+    two-choice automation UI, old copy removal, and data-integration status.
 - `npm run build` passed as part of E2E and refreshed `app/web/dist`.
 - `.\.venv312\Scripts\python.exe -m pytest` passed: 38 tests.
 - `.\.venv312\Scripts\python.exe -m ruff check .` passed.
@@ -97,6 +117,9 @@ Still mock/simulated:
 - Hero revert smoke passed on `http://127.0.0.1:8012/`: original
   `3問で開始` / `広告づくりを、3問から。` hero visible again and the experimental
   `マーケの作業を、AIで下書き。` headline absent.
+- MS3.5 browser smoke passed on `http://127.0.0.1:8012/`: home budget attrs,
+  two-choice automation UI, old copy absence, settings test statuses,
+  admin-only connection path, and 390x844 mobile no-horizontal-overflow check.
 - Visual SSoT smoke passed:
   - `rg` found no `--grad`, `#5b4ff0`, `#6d5cf5`, `rgba(76, 72, 210, ...)`, or
     `rgba(109, 92, 245, ...)` in `app/web/src/styles.css` or `app/web/dist`.
@@ -115,6 +138,8 @@ warning only.
   the proposal response arrives.
 - The experimental hero copy was reverted after owner feedback; future
   copy/voice changes should stay proposal-only unless explicitly approved.
+- The MS3.5 §5 copy/voice proposal was intentionally not implemented; §1-§4
+  were the approved implementation scope.
 - Loading phases are acceptable where they map directly to actual sequential API
   calls.
 - Retry should not mutate server state; it restores the prior brief into the
@@ -135,6 +160,7 @@ warning only.
 5. Continue backend hardening separately:
    Firestore append-only transaction, legal dictionary normalization, real
    GA4/Shopify, Google Ads OAuth, scoped real stop/pause.
+6. Review MS3.5 §5 copy/voice direction separately before broader copy changes.
 
 ## 7. Awaiting Approval / Decisions
 
@@ -157,3 +183,6 @@ warning only.
 - [x] Mock creative/audit/legal/kill-switch explanation text is Japanese.
 - [x] Back/retry controls do not mutate existing server campaign state.
 - [x] Existing unit/E2E/API tests cover the main path.
+- [x] MS3.5 budget upper bound, objective label, two-choice automation UI, and
+  Settings data-integration rows are implemented.
+- [x] §5 copy/voice proposal was left unimplemented pending approval.
