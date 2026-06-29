@@ -93,6 +93,8 @@ Example proposal request:
   approval can be requested.
 - Milestone 8: Kill Switch evaluation API that is explicit about simulated
   media status while real media stop APIs are not connected.
+- Milestone 9: production auth hardening with token expiry, disabled-auth
+  production guard, and a reusable role policy matrix.
 
 ## Persistence and secrets
 
@@ -143,8 +145,20 @@ AUTH_TOKEN_SECRET=sm://projects/<project-id>/secrets/tact-auth-token-secret/vers
 ```
 
 Signed bearer tokens carry verified `sub`, `org_id`, and `roles` claims. The
-service derives tenant scope from the verified token and ignores spoofable
-tenant headers such as `x-tact-org`.
+service derives tenant scope from the verified token, requires an `exp` claim,
+and ignores spoofable tenant headers such as `x-tact-org`.
+
+`APP_ENV=production` or `APP_ENV=prod` refuses to start with
+`AUTH_MODE=disabled`. Local disabled auth maps to an admin-only development
+context so the MVP remains easy to exercise without production risk.
+
+Role-gated operations use the shared policy matrix in `app/policy.py`:
+
+- `approver` or `admin`: approve/reject pending publish actions and future
+  budget changes.
+- `admin`: verify the global audit hash chain, legal overrides, and future real
+  Kill Switch stop mutations.
+- `operator`, `approver`, or `admin`: evaluate current Kill Switch status.
 
 ## Acceptance checklist
 
@@ -170,6 +184,9 @@ tenant headers such as `x-tact-org`.
 - [x] Publish approval requests require a passed rule-based legal check first.
 - [x] Kill Switch evaluation is audited and explicitly marks mock media status
   as simulated.
+- [x] Production cannot boot with `AUTH_MODE=disabled`.
+- [x] Signed bearer tokens require `exp` and expired tokens are rejected.
+- [x] Publish approval and audit verification are role-gated by policy matrix.
 - [x] `python3 -m pytest` and `python3 -m ruff check .` pass.
 
 ## Remaining assumptions

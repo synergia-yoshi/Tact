@@ -1,64 +1,83 @@
 # Tact Handoff
 
-## 1. 対象の実体
+## 1. Target SSoT
 
-Current SSoT is `synergia-yoshi/cursor` FastAPI MVP, local branch `codex/kill-switch-status` stacked on `codex/legal-check-api` commit `b8846ec2f9e199863f7099ae6522d0fad5192b17` / PR #8.
+Current SSoT is `synergia-yoshi/cursor` FastAPI MVP, local branch
+`codex/policy-auth-hardening` stacked on `codex/kill-switch-status` commit
+`d1fa295e1ab59ddbd737a52a5f85d80c836f4448` / PR #9.
 
-## 2. 今回やったこと
+## 2. What changed
 
-- Added `KillSwitchResult` model with explicit `data_kind`.
-- Added media delivery status request/response boundary to the media adapter.
-- Implemented mock media delivery status as `simulated`.
-- Added Kill Switch APIs:
-  - `POST /api/v1/campaigns/{campaign_id}/kill-switch/evaluate`
-  - `GET /api/v1/campaigns/{campaign_id}/kill-switch/latest`
-- Persisted Kill Switch evaluation results on campaign proposals.
-- Added audit entry `campaign.kill_switch.evaluated`.
-- Added tests for:
-  - latest result 404 before evaluation.
-  - unpublished campaigns explicitly reporting no real stop action.
-  - published mock campaigns reporting simulated media status and no real stop mutation.
-- Updated README.
+- Added `app/policy.py` with a reusable policy matrix for execution vs
+  recommendation boundaries.
+- Added role gates for:
+  - publish approval: `approver` or `admin`
+  - publish rejection: `approver` or `admin`
+  - audit hash-chain verification: `admin`
+  - Kill Switch evaluation: `operator`, `approver`, or `admin`
+  - future budget change, legal override, and real Kill Switch stop operations.
+- Changed local disabled auth to use a fixed admin dev context, preserving local
+  MVP ergonomics while keeping production guarded.
+- Added a settings validation guard that rejects `APP_ENV=production` or
+  `APP_ENV=prod` when `AUTH_MODE=disabled`.
+- Added `exp` to generated signed bearer tokens and reject missing/expired `exp`
+  during verification.
+- Updated README and `.env.example` with production auth and policy notes.
+- Added regression tests for production auth guard, token expiry, missing `exp`,
+  publish approval role gate, and audit verify role gate.
 
-## 3. 現在地
+## 3. Current state
 
-- 動くもの:
-  - Kill Switch evaluation exists and is audited.
-  - Mock media status is explicitly marked `simulated`.
-  - The API does not claim a real stop happened when only mock media exists.
-  - Published mock campaigns evaluate media status through the adapter boundary.
-- まだ動かないもの:
-  - No real media stop/pause API is connected.
-  - No emergency stop mutation is executed for live media.
-  - No role-gated emergency-stop approval flow yet.
-  - No UI display of Kill Switch status yet.
-- 既知の不具合/リスク:
-  - Current Kill Switch is a simulated evaluation, not a production stop mechanism.
-  - Real media adapter must implement measured delivery status and stop/pause mutation before production claims.
+- Working:
+  - Server refuses disabled auth in production settings.
+  - Signed bearer tokens now require valid `sub`, `org_id`, `roles`, and `exp`.
+  - Operator tokens can request publish approval but cannot approve it.
+  - Approver tokens can approve pending publish actions within the same org.
+  - Operator tokens cannot run global audit verify; admin tokens can.
+  - Local `AUTH_MODE=disabled` tests still exercise the MVP using dev admin.
+- Not working yet:
+  - Firestore audit append-only writes are not transaction-enforced yet.
+  - Legal check remains rule-based substring matching.
+  - No real budget-change, legal-override, or live media stop endpoint exists.
+- Known risk:
+  - Policy is enforced in service methods touched by this PR, but future
+    mutation endpoints must call the same matrix before implementation.
 
-## 4. 検証結果
+## 4. Validation
 
-- `.\.venv312\Scripts\python.exe -m pytest` passed: 27 tests.
+- `.\.venv312\Scripts\python.exe -m pip install -e ".[dev]"` passed.
+- `.\.venv312\Scripts\python.exe -m pytest` passed: 33 tests.
 - `.\.venv312\Scripts\python.exe -m ruff check .` passed.
-- Full package install/diff check will be rerun before commit/PR.
-- Warning observed: FastAPI/Starlette TestClient emits a deprecation warning recommending `httpx2`; no test failure.
+- `git diff --check` passed.
+- Warning observed: FastAPI/Starlette TestClient emits a deprecation warning
+  recommending `httpx2`; no test failure.
 
-## 5. 置いた仮定
+## 5. Assumptions made
 
-- Because real media APIs are not connected, Kill Switch should be explicit simulation rather than pretending to stop delivery.
-- `would_stop`/`clear` evaluation can exist before real stop mutation; real `stopped` should require a live adapter.
-- Production stop actions need role gating and audit before implementation.
+- Local disabled auth should remain convenient, so the fixed dev identity is now
+  admin while production startup blocks disabled auth.
+- `approver` is the minimum role allowed to execute a media publish approval or
+  rejection.
+- Audit verification is global enough to require `admin`.
+- Token TTL defaults to one hour when generated by the test/helper function;
+  production token minting remains outside this repository.
 
-## 6. 次にやること
+## 6. Next work
 
-1. Add reusable execution-vs-recommendation policy matrix and role gating.
-2. Gate approval, legal override, audit verify, and future stop actions by role.
+1. Make Firestore audit writes append-only with transaction checks around
+   `prev_hash`.
+2. Expand legal check vocabulary and severity handling beyond substring rules.
 3. Add real GA4 + Shopify read adapters and account mapping.
-4. Add Google Ads OAuth setup while keeping publish/budget changes `pending_approval`.
-5. Add real media stop/pause adapter methods once OAuth/scopes are approved.
+4. Add Google Ads OAuth setup while keeping publish/budget changes
+   `pending_approval`.
+5. Implement live media stop/pause adapter methods only after scopes and human
+   approval rules are decided.
 
-## 7. 承認待ち/要判断
+## 7. Awaiting approval / decisions
 
-- Which real media accounts/scopes can be paused by Tact is undecided.
-- Who can execute emergency stop, and whether it needs second approval, is undecided.
-- Real media publish, budget change, and campaign launch remain approval-gated and should not be automated without product/legal approval.
+- Exact production token issuer and TTL policy are not decided.
+- Whether publish approval needs second approval for high budgets is undecided.
+- Who can execute live emergency stop, and whether that requires two-person
+  approval, is undecided.
+- Firestore security rules and deployment IAM boundaries still need review
+  before production.

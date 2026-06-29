@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AdapterKind = Literal["mock", "real"]
@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     llm_api_base_url: str | None = Field(default=None, alias="LLM_API_BASE_URL")
     llm_api_key: str | None = Field(default=None, alias="LLM_API_KEY")
     auth_token_secret: str | None = Field(default=None, alias="AUTH_TOKEN_SECRET")
+
+    @model_validator(mode="after")
+    def reject_disabled_auth_in_production(self) -> "Settings":
+        if self.app_env.lower() in {"prod", "production"} and self.auth_mode == "disabled":
+            raise ValueError("AUTH_MODE=disabled is not allowed when APP_ENV=production")
+        return self
 
     @property
     def public_status(self) -> dict[str, str]:
