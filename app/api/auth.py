@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.auth import create_signed_auth_token
 from app.config import Settings, get_settings
 
-AuthRole = Literal["operator", "approver", "admin"]
+AuthRole = Literal["viewer", "operator", "approver", "admin"]
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 

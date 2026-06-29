@@ -25,19 +25,21 @@ import type {
   LegalCheckResult,
   MetricSnapshot,
   Role,
+  RoleAssignment,
   RouteName,
   UiError,
 } from "./types";
 import type { AppState, LoadingOperation, LoadingState } from "./store";
 
-const routes: Array<{ id: RouteName; label: string; icon: string }> = [
-  { id: "home", label: "ホーム", icon: '<path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" />' },
-  { id: "campaigns", label: "広告案", icon: '<rect x="3" y="4" width="18" height="6" rx="1.5" /><rect x="3" y="14" width="18" height="6" rx="1.5" />' },
-  { id: "dashboard", label: "成果", icon: '<path d="M4 19V5" /><path d="M4 19h16" /><path d="m8 15 3-4 3 2 4-7" />' },
-  { id: "tasks", label: "確認待ち", icon: '<path d="M9 11l3 3 8-8" /><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" />' },
-  { id: "creative", label: "広告素材", icon: '<rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="m21 15-5-5L5 21" />' },
-  { id: "audit", label: "記録", icon: '<path d="M12 3 4 7v6c0 5 8 8 8 8s8-3 8-8V7l-8-4Z" /><path d="m9 12 2 2 4-4" />' },
-  { id: "settings", label: "設定", icon: '<circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 1.6V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />' },
+const routes: Array<{ id: RouteName; label: string; icon: string; roles: Role[] }> = [
+  { id: "home", label: "ホーム", roles: ["viewer", "approver", "operator", "admin"], icon: '<path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" />' },
+  { id: "campaigns", label: "広告案", roles: ["operator", "admin"], icon: '<rect x="3" y="4" width="18" height="6" rx="1.5" /><rect x="3" y="14" width="18" height="6" rx="1.5" />' },
+  { id: "dashboard", label: "成果", roles: ["viewer", "approver", "operator", "admin"], icon: '<path d="M4 19V5" /><path d="M4 19h16" /><path d="m8 15 3-4 3 2 4-7" />' },
+  { id: "tasks", label: "確認待ち", roles: ["viewer", "approver", "operator", "admin"], icon: '<path d="M9 11l3 3 8-8" /><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" />' },
+  { id: "creative", label: "広告素材", roles: ["operator", "admin"], icon: '<rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="m21 15-5-5L5 21" />' },
+  { id: "audit", label: "記録", roles: ["operator", "admin"], icon: '<path d="M12 3 4 7v6c0 5 8 8 8 8s8-3 8-8V7l-8-4Z" /><path d="m9 12 2 2 4-4" />' },
+  { id: "roles", label: "ロール管理", roles: ["admin"], icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.9" /><path d="M16 3.1a4 4 0 0 1 0 7.8" />' },
+  { id: "settings", label: "設定", roles: ["admin"], icon: '<circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 1.6V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />' },
 ];
 
 let chart: Chart | null = null;
@@ -198,7 +200,9 @@ function el<T extends HTMLElement>(id: string): T {
 }
 
 function renderNav(): void {
+  const role = getState().role;
   el("nav-list").innerHTML = routes
+    .filter((route) => route.roles.includes(role))
     .map(
       (route) => `
         <button class="nav-item" type="button" data-route="${safeAttr(route.id)}" aria-label="${safeAttr(route.label)}">
@@ -211,8 +215,21 @@ function renderNav(): void {
 }
 
 function setRoute(route: RouteName): void {
+  const state = getState();
+  if (!canAccessRoute(route, state.role)) {
+    setState({
+      route: defaultRouteForRole(state.role),
+      error: {
+        status: 403,
+        message: `この画面は${requiredRoleLabel(route)}のみ表示できます。`,
+        detail: "route forbidden",
+      },
+    });
+    return;
+  }
   setState({ route, error: null });
   if (route === "audit") void loadAudit();
+  if (route === "roles") void loadRoles();
   if (route === "dashboard") void loadDashboard();
 }
 
@@ -227,10 +244,12 @@ function render(): void {
   renderIfChanged("tasks", campaignViewSignature(state, ["approveAction"]), renderTasks);
   renderIfChanged("dashboard", dashboardSignature(state), renderDashboard);
   renderIfChanged("audit", auditSignature(state), renderAudit);
+  renderIfChanged("roles", rolesSignature(state), renderRoles);
   renderIfChanged("settings", settingsSignature(state), renderSettings);
 }
 
 function renderShell(state: AppState): void {
+  renderNav();
   document.querySelectorAll<HTMLElement>(".view").forEach((view) => {
     view.classList.toggle("active", view.id === `view-${state.route}`);
   });
@@ -280,9 +299,24 @@ function serverLabel(state: AppState): string {
 }
 
 function roleLabel(role: Role): string {
+  if (role === "viewer") return "閲覧者";
   if (role === "approver") return "承認者";
   if (role === "admin") return "管理者";
   return "担当者";
+}
+
+function roleSurfaceLabel(role: Role): string {
+  if (role === "admin") return "管理面";
+  if (role === "operator") return "運用面";
+  return "顧客面";
+}
+
+function canCreateCampaign(role: Role): boolean {
+  return role === "operator" || role === "admin";
+}
+
+function canApproveCampaign(role: Role): boolean {
+  return role === "approver" || role === "admin";
 }
 
 function renderIfChanged(key: string, signature: string, renderer: () => void): void {
@@ -355,6 +389,30 @@ function settingsSignature(state: AppState): string {
   });
 }
 
+function rolesSignature(state: AppState): string {
+  return JSON.stringify({
+    role: state.role,
+    assignments: state.roleAssignments,
+    loading: loadingSignature(state, ["loadRoles", "updateRoleAssignment"]),
+    failedOperation: state.failedOperation,
+  });
+}
+
+function canAccessRoute(route: RouteName, role: Role): boolean {
+  return routes.find((item) => item.id === route)?.roles.includes(role) === true;
+}
+
+function defaultRouteForRole(role: Role): RouteName {
+  if (role === "viewer" || role === "approver") return "dashboard";
+  if (role === "admin") return "dashboard";
+  return "home";
+}
+
+function requiredRoleLabel(route: RouteName): string {
+  const allowed = routes.find((item) => item.id === route)?.roles ?? [];
+  return allowed.map(roleLabel).join("・");
+}
+
 function loadingSignature(state: AppState, operations: LoadingOperation[]): string {
   if (state.loading == null || !operations.includes(state.loading.operation)) return "";
   return JSON.stringify(state.loading);
@@ -368,9 +426,17 @@ function isLoading(operation: LoadingOperation, targetIdOrRole?: string): boolea
 }
 
 function renderHomeControls(state: AppState): void {
+  const canCreate = canCreateCampaign(state.role);
+  const form = el<HTMLFormElement>("campaign-form");
+  form.hidden = !canCreate;
+  renderCustomerHomeSummary(!canCreate);
+  el("home-title").innerHTML = canCreate
+    ? `広告づくりを、3問から。<br /><span>出す前の確認まで、ひとつずつ進めます。</span>`
+    : `成果と確認待ちを、ひとつずつ確認します。`;
+  if (!canCreate) return;
   const busy = isLoading("createCampaign");
   const disabled = state.loading != null || state.devTokenAvailable !== true;
-  el<HTMLFormElement>("campaign-form")
+  form
     .querySelectorAll<HTMLButtonElement | HTMLInputElement>("button, input")
     .forEach((control) => {
       control.disabled = disabled;
@@ -378,6 +444,32 @@ function renderHomeControls(state: AppState): void {
   el<HTMLButtonElement>("create-button").innerHTML = busy
     ? `${spinner()} 作成中...`
     : `広告案を作成する ${arrowIcon()}`;
+}
+
+function renderCustomerHomeSummary(visible: boolean): void {
+  let summary = document.getElementById("customer-home-summary");
+  if (summary == null) {
+    summary = document.createElement("section");
+    summary.id = "customer-home-summary";
+    summary.className = "customer-home-summary";
+    el("campaign-form").before(summary);
+  }
+  summary.hidden = !visible;
+  if (!visible) return;
+  const campaign = activeOrLatest();
+  summary.innerHTML = campaign == null
+    ? emptyState("確認できる広告案はまだありません", "広告案が作成されると、成果と確認待ちをここから確認できます。")
+    : `
+      <article class="setting-card settings-wide">
+        <span class="data-label forecast">${escapeHtml(roleSurfaceLabel(getState().role))}</span>
+        <h3>${escapeHtml(campaign.brief.name)}</h3>
+        <p>成果と確認待ちを確認できます。作成や設定は運用担当または管理者が行います。</p>
+        <div class="action-cluster card-action">
+          <button class="btn primary" type="button" data-route="dashboard">成果を見る</button>
+          <button class="btn ghost" type="button" data-route="tasks">確認待ちを見る</button>
+        </div>
+      </article>
+    `;
 }
 
 function renderHomeStepper(): void {
@@ -778,6 +870,7 @@ function renderTasks(): void {
     return;
   }
   const pending = pendingPublishAction(campaign);
+  const canApprove = canApproveCampaign(getState().role);
   if (pending == null) {
     content.innerHTML = emptyState("確認待ちはありません", "数字と表現の確認を通すと、広告を出す前の最終確認がここに入ります。");
     return;
@@ -791,11 +884,15 @@ function renderTasks(): void {
         <div>
           <span class="data-label pending">確認待ち</span>
           <h3>${escapeHtml(campaign.brief.name)} を広告に出す</h3>
-          <p>数字と表現の確認は完了済み。広告を出す最終確認ができるのは承認者または管理者のみです。</p>
+          <p>${canApprove ? "数字と表現の確認は完了済み。広告を出す最終確認ができます。" : "数字と表現の確認は完了済み。承認操作は承認者または管理者のみです。"}</p>
         </div>
-        <button class="btn primary" type="button" data-approve-action="${safeAttr(pending.id)}" ${actionDisabled ? "disabled" : ""}>
-          ${approveBusy ? `${spinner()} 処理中...` : "広告を出すことを承認"}
-        </button>
+        ${
+          canApprove
+            ? `<button class="btn primary" type="button" data-approve-action="${safeAttr(pending.id)}" ${actionDisabled ? "disabled" : ""}>
+                ${approveBusy ? `${spinner()} 処理中...` : "広告を出すことを承認"}
+              </button>`
+            : `<span class="status-pill amber">承認者・管理者のみ</span>`
+        }
       </article>
       ${approveBusy ? loadingPanel("承認を送信中...") : ""}
     </div>
@@ -1132,6 +1229,7 @@ function sparklineSvg(points: MetricSeriesPoint[]): string {
 
 function improvementCycleRow(cycle: ImprovementCycle): string {
   const source = cycle.source == null ? "提案なし" : sourceText(cycle.source, cycle.data_kind);
+  const canOpenEvidence = cycle.evidence_event_type != null && canAccessRoute("audit", getState().role);
   return `
     <article class="loop-item ${safeAttr(cycle.stage)}">
       <span class="loop-dot" aria-hidden="true"></span>
@@ -1142,7 +1240,7 @@ function improvementCycleRow(cycle: ImprovementCycle): string {
         <small>${escapeHtml(cycle.result)}</small>
       </div>
       ${
-        cycle.evidence_event_type == null
+        !canOpenEvidence
           ? ""
           : `<button class="btn ghost loop-evidence" type="button" data-route="audit">根拠</button>`
       }
@@ -1158,6 +1256,7 @@ function killSwitchPanel(dashboard: CampaignDashboard): string {
   const busyCheck = isLoading("checkKillSwitch", dashboard.campaign_id);
   const busyStop = isLoading("requestKillSwitchStop", dashboard.campaign_id);
   const disableAll = state.loading != null || state.devTokenAvailable !== true;
+  const canCheck = state.role !== "viewer";
   const canStop = state.role === "approver" || state.role === "admin";
   return `
     <div class="sec-title" id="kill-switch-title">Kill Switch<span class="hint">監査記録あり</span></div>
@@ -1168,7 +1267,7 @@ function killSwitchPanel(dashboard: CampaignDashboard): string {
       <small>${escapeHtml(`${kill.source == null ? "サーバー確認待ち" : sourceText(kill.source, kill.data_kind)} / ${checkedAt}`)}</small>
     </div>
     <div class="kill-actions">
-      <button class="btn ghost" type="button" data-kill-check="${safeAttr(dashboard.campaign_id)}" ${disableAll ? "disabled" : ""}>
+      <button class="btn ghost" type="button" data-kill-check="${safeAttr(dashboard.campaign_id)}" ${disableAll || !canCheck ? "disabled" : ""}>
         ${busyCheck ? `${spinner()} 確認中...` : "状態を確認"}
       </button>
       <button class="btn primary" type="button" data-kill-stop="${safeAttr(dashboard.campaign_id)}" ${disableAll || !canStop ? "disabled" : ""}>
@@ -1180,6 +1279,7 @@ function killSwitchPanel(dashboard: CampaignDashboard): string {
 }
 
 function syncDashboardActionStates(state: AppState): void {
+  const canCheck = state.role !== "viewer";
   const canStop = state.role === "approver" || state.role === "admin";
   document.querySelectorAll<HTMLButtonElement>("[data-kill-stop]").forEach((button) => {
     const busy = isLoading("requestKillSwitchStop", button.dataset.killStop);
@@ -1189,7 +1289,8 @@ function syncDashboardActionStates(state: AppState): void {
   });
   document.querySelectorAll<HTMLButtonElement>("[data-kill-check]").forEach((button) => {
     const busy = isLoading("checkKillSwitch", button.dataset.killCheck);
-    button.disabled = state.loading != null || state.devTokenAvailable !== true;
+    button.disabled = state.loading != null || state.devTokenAvailable !== true || !canCheck;
+    button.title = canCheck ? "サーバーで状態を確認" : "閲覧者は状態確認を実行できません";
     button.innerHTML = busy ? `${spinner()} 確認中...` : "状態を確認";
   });
 }
@@ -1371,6 +1472,54 @@ function auditSummary(entry: { event_type: string; summary: string }): string {
   return summaries[entry.event_type] ?? entry.summary;
 }
 
+function renderRoles(): void {
+  const state = getState();
+  const content = el("roles-content");
+  if (state.role !== "admin") {
+    content.innerHTML = emptyState("管理者のみ表示できます", "ロール管理は管理者だけが操作できます。");
+    return;
+  }
+  if (isLoading("loadRoles")) {
+    content.innerHTML = loadingPanel("ロール管理を読み込み中...");
+    return;
+  }
+  content.innerHTML = `
+    <div class="role-admin-grid">
+      ${state.roleAssignments.map(roleAssignmentRow).join("") || emptyState("ロール登録がありません", "管理対象が追加されるとここに表示します。")}
+    </div>
+  `;
+}
+
+function roleAssignmentRow(assignment: RoleAssignment): string {
+  const current = assignment.roles[0] ?? "viewer";
+  const busy = isLoading("updateRoleAssignment", assignment.actor_id);
+  const roleOptions: Role[] = ["viewer", "approver", "operator", "admin"];
+  return `
+    <article class="setting-card role-card">
+      <div class="setting-head">
+        <div>
+          <span class="data-label forecast">${escapeHtml(assignment.surface)}</span>
+          <h3>${escapeHtml(assignment.display_name)}</h3>
+          <p>${escapeHtml(assignment.actor_id)}</p>
+        </div>
+        <span class="status-pill neutral">${escapeHtml(roleLabel(current))}</span>
+      </div>
+      <div class="role-choice-row" aria-label="${safeAttr(`${assignment.display_name}のロール`)}">
+        ${roleOptions
+          .map(
+            (role) => `
+              <button class="segment-button ${role === current ? "active" : ""}" type="button" data-role-update="${safeAttr(assignment.actor_id)}" data-next-role="${safeAttr(role)}" ${busy || role === current ? "disabled" : ""}>
+                ${busy && role !== current ? "" : escapeHtml(roleLabel(role))}
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+      <p class="setting-note">ロール変更は監査に保存します。鍵や個人情報は表示しません。</p>
+    </article>
+  `;
+}
+
 function renderSettings(): void {
   const state = getState();
   const canManageIntegrations = state.devTokenAvailable === true && state.role === "admin";
@@ -1530,6 +1679,14 @@ function bindEvents(): void {
       void requestKillSwitchStop(killStop.dataset.killStop);
     }
 
+    const roleUpdate = target.closest<HTMLButtonElement>("[data-role-update]");
+    if (roleUpdate?.dataset.roleUpdate != null && roleUpdate.dataset.nextRole != null) {
+      void updateRoleAssignment(
+        roleUpdate.dataset.roleUpdate,
+        roleUpdate.dataset.nextRole as Role,
+      );
+    }
+
     const selectCampaign = target.closest<HTMLButtonElement>("[data-select-campaign]");
     if (selectCampaign?.dataset.selectCampaign != null) {
       setState({ activeCampaignId: selectCampaign.dataset.selectCampaign });
@@ -1618,16 +1775,32 @@ async function switchRole(role: Role): Promise<void> {
     const auth = await api.devToken(role);
     setBearerToken(auth.token);
     const campaigns = await api.listCampaigns();
+    const route = canAccessRoute(getState().route, role)
+      ? getState().route
+      : defaultRouteForRole(role);
+    const activeCampaignId = nextActiveCampaignId(campaigns);
     setState({
       role,
+      route,
       auth,
       devTokenAvailable: true,
       campaigns,
-      activeCampaignId: nextActiveCampaignId(campaigns),
+      activeCampaignId,
+      auditEntries: [],
+      roleAssignments: [],
       loading: null,
       error: null,
     });
     if (getState().route === "audit") void loadAudit();
+    if (getState().route === "roles") void loadRoles();
+    if (getState().route === "dashboard") {
+      const nextState = getState();
+      if (nextState.dashboard?.campaign_id === nextState.activeCampaignId) {
+        syncDashboardActionStates(nextState);
+      } else {
+        void loadDashboard();
+      }
+    }
   } catch (error) {
     const uiError = error as UiError;
     if (
@@ -1720,6 +1893,33 @@ async function requestKillSwitchStop(campaignId: string): Promise<void> {
     await api.requestKillSwitchStop(campaignId);
     const dashboard = await fetchDashboard(campaignId);
     setState({ dashboard, error: null, loading: null });
+  } catch (error) {
+    setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
+  }
+}
+
+async function loadRoles(): Promise<void> {
+  if (!beginOperation({ operation: "loadRoles" })) return;
+  try {
+    const roleAssignments = await api.listRoles();
+    setState({ roleAssignments, error: null, loading: null });
+  } catch (error) {
+    setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
+  }
+}
+
+async function updateRoleAssignment(actorId: string, role: Role): Promise<void> {
+  if (!beginOperation({ operation: "updateRoleAssignment", targetId: actorId })) return;
+  try {
+    const updated = await api.updateRole(actorId, [role]);
+    const current = getState().roleAssignments;
+    setState({
+      roleAssignments: current.map((assignment) =>
+        assignment.actor_id === updated.actor_id ? updated : assignment,
+      ),
+      error: null,
+      loading: null,
+    });
   } catch (error) {
     setState({ error: error as UiError, failedOperation: getState().loading, loading: null });
   }

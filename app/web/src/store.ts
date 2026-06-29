@@ -7,6 +7,7 @@ import type {
   DashboardPeriod,
   DevTokenResponse,
   Role,
+  RoleAssignment,
   RouteName,
   UiError,
 } from "./types";
@@ -20,7 +21,9 @@ export type LoadingOperation =
   | "checkKillSwitch"
   | "requestKillSwitchStop"
   | "loadAudit"
-  | "verifyAudit";
+  | "verifyAudit"
+  | "loadRoles"
+  | "updateRoleAssignment";
 
 export interface LoadingState {
   operation: LoadingOperation;
@@ -41,6 +44,7 @@ export interface AppState {
     channel: DashboardChannelFilter;
   };
   auditEntries: AuditEntry[];
+  roleAssignments: RoleAssignment[];
   loading: LoadingState | null;
   failedOperation: LoadingState | null;
   error: UiError | null;
@@ -62,6 +66,7 @@ const state: AppState = {
     channel: "all",
   },
   auditEntries: [],
+  roleAssignments: [],
   loading: null,
   failedOperation: null,
   error: null,

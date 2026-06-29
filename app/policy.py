@@ -4,7 +4,13 @@ from typing import Literal
 
 from app.auth import AuthContext
 
+RoleName = Literal["viewer", "approver", "operator", "admin"]
 PolicyOperation = Literal[
+    "campaign.read",
+    "campaign.create",
+    "campaign.operate",
+    "dashboard.read",
+    "audit.read",
     "publish.approve",
     "publish.reject",
     "budget.change",
@@ -12,9 +18,15 @@ PolicyOperation = Literal[
     "audit.verify",
     "kill_switch.evaluate",
     "kill_switch.stop",
+    "role.manage",
 ]
 
 POLICY_MATRIX: dict[PolicyOperation, frozenset[str]] = {
+    "campaign.read": frozenset({"viewer", "approver", "operator", "admin"}),
+    "campaign.create": frozenset({"operator", "admin"}),
+    "campaign.operate": frozenset({"operator", "admin"}),
+    "dashboard.read": frozenset({"viewer", "approver", "operator", "admin"}),
+    "audit.read": frozenset({"operator", "admin"}),
     "publish.approve": frozenset({"approver", "admin"}),
     "publish.reject": frozenset({"approver", "admin"}),
     "budget.change": frozenset({"approver", "admin"}),
@@ -22,6 +34,7 @@ POLICY_MATRIX: dict[PolicyOperation, frozenset[str]] = {
     "audit.verify": frozenset({"admin"}),
     "kill_switch.evaluate": frozenset({"operator", "approver", "admin"}),
     "kill_switch.stop": frozenset({"approver", "admin"}),
+    "role.manage": frozenset({"admin"}),
 }
 
 

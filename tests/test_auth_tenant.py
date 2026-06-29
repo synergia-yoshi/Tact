@@ -139,6 +139,102 @@ def test_publish_approval_requires_approver_role(signed_auth_env: None) -> None:
     assert approved_response.json()["actions"][0]["approval_status"] == "approved"
 
 
+def test_ms5_role_scopes_are_enforced_by_api(signed_auth_env: None) -> None:
+    client = TestClient(create_app())
+    operator_headers = _headers(actor_id="operator", org_id="org-a", roles=["operator"])
+    viewer_headers = _headers(actor_id="viewer", org_id="org-a", roles=["viewer"])
+    approver_headers = _headers(actor_id="approver", org_id="org-a", roles=["approver"])
+    campaign = _create_ready_to_publish_campaign(client, operator_headers)
+    action = campaign["actions"][0]
+
+    viewer_create = client.post(
+        "/api/v1/campaigns/proposals",
+        json={
+            "name": "Viewer Attempt",
+            "objective": "conversion",
+            "target_audience": "growth teams",
+            "total_budget_jpy": 100000,
+            "channels": ["search"],
+        },
+        headers=viewer_headers,
+    )
+    assert viewer_create.status_code == 403
+
+    approver_create = client.post(
+        "/api/v1/campaigns/proposals",
+        json={
+            "name": "Approver Attempt",
+            "objective": "conversion",
+            "target_audience": "growth teams",
+            "total_budget_jpy": 100000,
+            "channels": ["search"],
+        },
+        headers=approver_headers,
+    )
+    assert approver_create.status_code == 403
+
+    viewer_gate = client.post(
+        f"/api/v1/campaigns/{campaign['id']}/measurements/refresh",
+        headers=viewer_headers,
+    )
+    assert viewer_gate.status_code == 403
+
+    operator_approve = client.post(
+        f"/api/v1/campaigns/{campaign['id']}/actions/{action['id']}/approve",
+        headers=operator_headers,
+    )
+    assert operator_approve.status_code == 403
+
+    viewer_dashboard = client.get(
+        f"/api/v1/campaigns/{campaign['id']}/dashboard",
+        headers=viewer_headers,
+    )
+    assert viewer_dashboard.status_code == 200
+
+    scoped_campaign = client.get(
+        f"/api/v1/campaigns/{campaign['id']}",
+        headers=viewer_headers,
+    )
+    assert scoped_campaign.status_code == 200
+    scoped = scoped_campaign.json()
+    assert scoped["media_plan"]["account_id"] == "redacted"
+    assert scoped["media_plan"]["request_id"] == "redacted"
+    assert scoped["media_plan"]["placements"][0]["targeting"] == {}
+    assert scoped["actions"][0]["payload"] == {}
+    assert set(scoped["actions"][0]["guardrail_result"]) == {"status"}
+
+
+def test_role_management_requires_admin_and_is_audited(signed_auth_env: None) -> None:
+    client = TestClient(create_app())
+    operator_headers = _headers(actor_id="operator", org_id="org-a", roles=["operator"])
+    admin_headers = _headers(actor_id="admin", org_id="org-a", roles=["admin"])
+
+    denied = client.get("/api/v1/roles", headers=operator_headers)
+    assert denied.status_code == 403
+
+    role_list = client.get("/api/v1/roles", headers=admin_headers)
+    assert role_list.status_code == 200
+    assert {assignment["actor_id"] for assignment in role_list.json()} >= {
+        "client-viewer",
+        "client-approver",
+        "ops-operator",
+        "admin",
+    }
+
+    update = client.post(
+        "/api/v1/roles/client-viewer",
+        json={"roles": ["approver"]},
+        headers=admin_headers,
+    )
+    assert update.status_code == 200
+    assert update.json()["roles"] == ["approver"]
+    assert update.json()["surface"] == "顧客面"
+
+    verification = client.get("/api/v1/campaigns/audit/verify", headers=admin_headers)
+    assert verification.status_code == 200
+    assert verification.json()["valid"] is True
+
+
 def test_audit_verify_requires_admin_role(signed_auth_env: None) -> None:
     client = TestClient(create_app())
     operator_headers = _headers(actor_id="operator", org_id="org-a", roles=["operator"])
@@ -184,9 +280,16 @@ def test_kill_switch_stop_requires_approver_or_admin(signed_auth_env: None) -> N
     assert result["data_kind"] == "simulated"
     assert "実際の広告停止操作は行っていません" in result["reason"]
 
-    audit_response = client.get(
+    scoped_audit_response = client.get(
         f"/api/v1/campaigns/{campaign['id']}/audit",
         headers=approver_headers,
+    )
+    assert scoped_audit_response.status_code == 403
+
+    admin_headers = _headers(actor_id="admin", org_id="org-a", roles=["admin"])
+    audit_response = client.get(
+        f"/api/v1/campaigns/{campaign['id']}/audit",
+        headers=admin_headers,
     )
 
     assert audit_response.status_code == 200
