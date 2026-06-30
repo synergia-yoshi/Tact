@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function fillRequiredBrief(
   page: Page,
-  product = "法人向け勤怠管理ツール",
+  product = "勤怠管理ツール",
 ): Promise<void> {
   await page.locator("#product-input").fill(product);
 }
@@ -46,7 +46,8 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   );
   await page.getByRole("button", { name: /広告案を作成する/ }).click();
   const proposal = await proposalResponsePromise.then((response) => response.json());
-  expect(proposal.brief.name).toBe("法人向け勤怠管理ツール");
+  expect(proposal.brief.name).toBe("勤怠管理ツール");
+  expect(proposal.brief.target_audience).toBe("未指定");
   expect(proposal.brief.objective).toBe("awareness");
   expect(proposal.brief.kpis).toContain("reach");
   expect(proposal.brief.total_budget_jpy).toBe(5_000_000);

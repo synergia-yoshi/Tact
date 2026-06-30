@@ -237,7 +237,7 @@ function createCampaign(brief: CampaignBrief): CampaignProposal {
       mode: "demo",
     },
     creative_spec: {
-      headline: `${brief.name} のテスト用訴求`,
+      headline: `${brief.name} のテスト用広告案`,
       format: "responsive_search_and_social",
     },
   }));
@@ -248,8 +248,8 @@ function createCampaign(brief: CampaignBrief): CampaignProposal {
     brief,
     creative: {
       source: "mock",
-      headline: `${brief.name}を、はじめての方にもわかりやすく。`,
-      body: "特徴、価格、安心材料を短く伝えるテスト用の広告文です。",
+      headline: `${brief.name}の広告案を確認する`,
+      body: "入力された商材名と選んだ目標をもとに表示する、テスト用の広告文です。",
       call_to_action: "詳しく見る",
       hashtags: ["#テスト用", "#広告案"],
       compliance_notes: ["テスト用の文面です。実配信前に人が確認します。"],
