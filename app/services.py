@@ -396,6 +396,9 @@ class CampaignService:
                 campaign_id=campaign.id,
                 campaign_name=campaign.brief.name,
                 total_budget_jpy=campaign.brief.total_budget_jpy,
+                objective=campaign.brief.objective,
+                target_audience=campaign.brief.target_audience,
+                channels=campaign.brief.channels,
             )
         )
         campaign.metric_snapshots.append(snapshot)
@@ -786,7 +789,7 @@ class CampaignService:
                     campaign.media_plan.estimated_cpa_jpy,
                     "jpy",
                     data_kind="simulated",
-                    source="media_plan_mock",
+                    source=self._media_plan_metric_source(campaign),
                     estimate_range=campaign.media_plan.estimated_cpa_jpy_range,
                 ),
                 self._metric(
@@ -875,7 +878,7 @@ class CampaignService:
                 placement.budget_jpy,
                 "jpy",
                 data_kind="simulated",
-                source="media_plan_mock",
+                source=self._media_plan_metric_source(campaign),
             )
             if metric is None:
                 rows.append(
@@ -981,7 +984,7 @@ class CampaignService:
                 title="宣伝内容を受付",
                 changed=f"目的: {campaign.brief.objective}",
                 result="広告案の材料として保存しました。",
-                source="media_plan_mock",
+                source=self._media_plan_metric_source(campaign),
                 data_kind="simulated",
                 occurred_at=campaign.created_at,
                 evidence_event_type="campaign.proposal.created",
@@ -991,7 +994,7 @@ class CampaignService:
                 title="広告文と配信案を作成",
                 changed=f"{len(campaign.media_plan.placements)}媒体に配分しました。",
                 result="公開前の確認に進める案を作成しました。",
-                source="media_plan_mock",
+                source=self._media_plan_metric_source(campaign),
                 data_kind="simulated",
                 occurred_at=campaign.media_plan.generated_at,
                 evidence_event_type="campaign.proposal.created",
@@ -1088,6 +1091,9 @@ class CampaignService:
             estimate_range=estimate_range,
             series=series or [],
         )
+
+    def _media_plan_metric_source(self, campaign: CampaignProposal) -> str:
+        return "media_plan_model" if campaign.media_plan.source == "model" else "media_plan_mock"
 
     def _filter_series(
         self,

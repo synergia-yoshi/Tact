@@ -595,7 +595,7 @@ function series(key: DashboardMetric["key"] | keyof MetricSnapshot["series"], to
     const timestamp = new Date(today);
     timestamp.setDate(today.getDate() - (9 - index));
     const missing = index === 3;
-    const slope = 0.58 + index * 0.055;
+    const slope = 0.57 + index * 0.055;
     const value = missing ? null : roundMetric(key, total * slope);
     return {
       timestamp: timestamp.toISOString(),

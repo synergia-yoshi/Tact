@@ -59,10 +59,10 @@
         <section class="view active" id="view-home" aria-labelledby="home-title">
           <div class="hero-panel">
             <div>
-              <p class="eyebrow centerless">3問で開始</p>
-              <h2 id="home-title">広告づくりを、3問から。<br /><span>出す前の確認まで、ひとつずつ進めます。</span></h2>
+              <p class="eyebrow centerless">4問で開始</p>
+              <h2 id="home-title">広告づくりを、4問から。<br /><span>出す前の確認まで、ひとつずつ進めます。</span></h2>
               <p class="lead">
-                商材・予算・任せる範囲を入れると、広告文と出し先の案を作ります。広告を出す前には、数字と表現を確認します。
+                商材・予算・目標・任せる範囲を入れると、広告文と出し先の案を作ります。広告を出す前には、数字と表現を確認します。
               </p>
             </div>
             <div class="policy-card">
@@ -78,14 +78,17 @@
             <article class="question-card">
               <span class="question-number">01</span>
               <div>
-                <label for="product-input">何を宣伝しますか？</label>
-                <input id="product-input" name="product" class="text-input" value="オーガニック化粧品の通販" required />
-                <div class="chips" aria-label="業種チップ">
-                  <button type="button" class="chip selected" data-product="オーガニック化粧品の通販">スキンケア通販</button>
-                  <button type="button" class="chip" data-product="美容サロンの初回予約">美容サロン</button>
-                  <button type="button" class="chip" data-product="法人向け勤怠ツール">法人向けツール</button>
-                  <button type="button" class="chip" data-product="クラフトバルの来店予約">クラフトバル</button>
-                </div>
+                <label for="product-input">商材・サービスは何ですか？</label>
+                <input
+                  id="product-input"
+                  name="product"
+                  class="text-input"
+                  placeholder="例：法人向け勤怠管理ツール"
+                  aria-describedby="product-input-hint"
+                  autocomplete="off"
+                  required
+                />
+                <p class="field-hint" id="product-input-hint">購入・予約・資料請求などの目的は次の目標で選びます。ここは商品名やサービス名だけで大丈夫です。</p>
               </div>
             </article>
             <article class="question-card">
@@ -94,15 +97,43 @@
                 <label for="budget-range">月の予算は？</label>
                 <div class="budget-value"><b id="budget-value">¥500,000</b><span>/ 月</span></div>
                 <input id="budget-range" name="budget" type="range" min="10" max="500" value="50" step="10" />
-                <div class="goal-pills" aria-label="ゴール">
-                  <button type="button" class="goal-pill selected" data-objective="conversion">売上</button>
-                  <button type="button" class="goal-pill" data-objective="lead_generation">新規顧客</button>
-                  <button type="button" class="goal-pill" data-objective="efficiency">費用対効果を最大化</button>
-                </div>
               </div>
             </article>
             <article class="question-card">
               <span class="question-number">03</span>
+              <div>
+                <p class="field-label">何を増やしたいですか？</p>
+                <p class="field-hint">選んだ目標で、優先する媒体配分と確認する指標を変えます。</p>
+                <div class="objective-grid" aria-label="広告目標">
+                  <button type="button" class="objective-card selected" data-objective="conversion">
+                    <span>売上・購入</span>
+                    <small>ROAS・購入数・売上額</small>
+                  </button>
+                  <button type="button" class="objective-card" data-objective="lead_generation">
+                    <span>見込み顧客</span>
+                    <small>リード数・獲得単価・送信数</small>
+                  </button>
+                  <button type="button" class="objective-card" data-objective="traffic">
+                    <span>サイト訪問</span>
+                    <small>クリック数・CTR・CPC</small>
+                  </button>
+                  <button type="button" class="objective-card" data-objective="awareness">
+                    <span>認知拡大</span>
+                    <small>表示回数・リーチ・CPM</small>
+                  </button>
+                  <button type="button" class="objective-card" data-objective="local_visits">
+                    <span>来店・予約</span>
+                    <small>来店数・予約数・来店単価</small>
+                  </button>
+                  <button type="button" class="objective-card" data-objective="app_promotion">
+                    <span>アプリ獲得</span>
+                    <small>インストール・獲得単価・利用</small>
+                  </button>
+                </div>
+              </div>
+            </article>
+            <article class="question-card">
+              <span class="question-number">04</span>
               <div>
                 <p class="field-label">どこまで自動作成にまかせますか？</p>
                 <div class="choice-cards">

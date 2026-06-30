@@ -910,7 +910,7 @@ function renderCreative(): void {
         .join("")}
     </div>
     <div class="out in">
-      <h3>成果の目安 <span class="data-label forecast">予測 / テスト用</span></h3>
+      <h3>成果の目安 <span class="data-label forecast">予測 / 自動推定</span></h3>
       <div class="kpi-row">
         ${metricCell("届く人数の目安", reach.value, reach.sub)}
         ${metricCell("1件あたり費用の目安", cpa.value, cpa.sub)}
@@ -1445,6 +1445,7 @@ function sourceText(source: string, dataKind: string | null): string {
   if (isDemoMode) return "テスト用";
   if (source === "ga4_shopify") return "実データ";
   if (source === "media_plan_mock") return "テスト用";
+  if (source === "media_plan_model") return "自動推定";
   if (source === "ga4_shopify_mock" || source === "mock_media") return "テスト用";
   if (dataKind === "measured") return "実データ";
   return "自動推定";

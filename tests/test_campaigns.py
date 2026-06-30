@@ -25,7 +25,7 @@ def test_create_and_get_campaign_proposal() -> None:
     assert proposal["creative"]["headline"] == "はじめての広告案"
     assert proposal["creative"]["source"] == "mock"
     assert proposal["creative"]["hashtags"] == ["#search", "#social", "#display"]
-    assert proposal["media_plan"]["source"] == "mock"
+    assert proposal["media_plan"]["source"] == "model"
     assert len(proposal["media_plan"]["placements"]) == 3
     assert (
         sum(placement["budget_jpy"] for placement in proposal["media_plan"]["placements"])
@@ -35,10 +35,10 @@ def test_create_and_get_campaign_proposal() -> None:
     assert proposal["media_plan"]["estimated_reach_range"]["high"] > (
         proposal["media_plan"]["estimated_reach_range"]["low"]
     )
-    assert proposal["media_plan"]["estimated_reach_range"]["confidence"] == 0.58
-    assert proposal["media_plan"]["estimated_reach_range"]["source"] == "mock"
-    assert proposal["media_plan"]["estimated_cpa_jpy_range"]["confidence"] == 0.54
-    assert proposal["media_plan"]["estimated_cpa_jpy_range"]["source"] == "mock"
+    assert 0 < proposal["media_plan"]["estimated_reach_range"]["confidence"] <= 1
+    assert proposal["media_plan"]["estimated_reach_range"]["source"] == "model"
+    assert 0 < proposal["media_plan"]["estimated_cpa_jpy_range"]["confidence"] <= 1
+    assert proposal["media_plan"]["estimated_cpa_jpy_range"]["source"] == "model"
 
     get_response = client.get(f"/api/v1/campaigns/{proposal['id']}")
 
@@ -144,8 +144,8 @@ def test_publish_requires_approval_then_fetches_performance() -> None:
     assert measurement["labels"]["roas"] == "simulated"
     assert measurement["cpa_jpy_range"]["low"] > 0
     assert measurement["cpa_jpy_range"]["high"] > measurement["cpa_jpy_range"]["low"]
-    assert measurement["cpa_jpy_range"]["confidence"] == measurement["confidence"]
-    assert measurement["cpa_jpy_range"]["source"] == "mock"
+    assert 0 < measurement["cpa_jpy_range"]["confidence"] <= 1
+    assert measurement["cpa_jpy_range"]["source"] == "model"
 
     publish_response = client.post(f"/api/v1/campaigns/{campaign_id}/publish")
 

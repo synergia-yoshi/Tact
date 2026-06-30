@@ -1,0 +1,328 @@
+# ============================================================================
+# benchmarks.yaml — Tact engine 前提SSoT（シード版）
+# Target repo path: app/domain/benchmarks.yaml （現在リポはmount外。Codexがこれを基に配置）
+# ----------------------------------------------------------------------------
+# 不可侵原則（見た目＞実体にしない）に従い、全数値に source / year / type / data_kind / 確信度 を付す。
+# これは「オーナー確認前のテスト用シード」。断定値ではない。実データ(GA4/各媒体API)接続後に上書きする。
+# 出所の一次抽出は vault: 40_Resources/marketing-knowledge/benchmark-seeds.md
+# ============================================================================
+
+meta:
+  version: "0.1.0-seed"
+  generated: "2026-06-30"
+  data_kind_default: "industry_seed"   # 業界ベンチ＝テスト用シード（個社実測ではない）
+  policy:
+    - "actual(実績)は強い事前分布、sim(代理店試算)は弱い事前分布として確信度を下げる。"
+    - "値は点推定で使わず、95%予言区間の中心＋幅(sd,n)で扱う。"
+    - "古い試算(2014-15)は staleness で区間を広げる。実測が貯まればベイズ更新で上書き。"
+    - "ベンチの無い industry は generic_fallback＋広い区間でフォールバックし、その旨を明示。"
+    - "現存しない媒体(defunct_media)は現行の媒体選択肢に出さない。古い実績は構造傾向の参考のみ＝現行媒体に読み替える。"
+  defunct_media: [mediaforge, vizury, gunosy]   # 出所資料に登場するが現存しない／広告媒体として扱わない（現行UIに出さない）
+
+# ---- 列挙（実装側のenum想定） -------------------------------------------------
+conventions:
+  industries: [real_estate_rental, real_estate_sale, finance_securities, bridal,
+               education_school, recruiting, ec_photobook, btob_saas, app_install_automotive, ec_generic]
+  media: [google_search, yahoo_search, gdn, ydn, yahoo_infeed, facebook, facebook_dpa,
+          twitter, smartnews, youtube, gumgum, dsp, retargeting, seo]
+  devices: [pc, sp, tv, tablet, all]
+  funnel_stages: [latent, semi_intent, intent, nomination, retargeting]   # 潜在/準顕在/顕在/指名/リタゲ
+  metrics: [cpm, ctr, cpc, cvr, cpa, cpi, install_rate, aov]              # aov=客単価
+
+# ---- 確信度モデル（実装ヒント） -----------------------------------------------
+confidence_model:
+  by_type: { actual: 0.7, sim: 0.4 }          # 起点。n と staleness で調整。
+  staleness_halflife_years: 5                  # 経過年で確信度を半減（区間を広げる）
+  note: "sd/n が無いシードは confidence から区間幅を逆算（低確信度=広い区間）。旧固定信頼度は使わない。"
+
+# ============================================================================
+# 業種別ベンチ（industry × media × device × funnel_stage）
+# 各 entry: metrics{...} + source{file,year,type} + n + (sd) + confidence
+# ============================================================================
+benchmarks:
+
+  # --- 1. 賃貸・不動産ポータル（じげん, 2014, sim） ---------------------------
+  - industry: real_estate_rental
+    source: { file: "じげん 御中 配信シミュレーション資料.pdf", year: 2014, type: sim }
+    aggregate: { ctr: 0.0019, cpc: 70, cvr: 0.0143, cpa: 4865 }
+    rows:
+      - { media: google_search, device: pc, funnel_stage: intent, ctr: 0.0230, cpc: 91,  cvr: 0.0094, cpa: 9724,  n: 1, confidence: 0.35 }
+      - { media: google_search, device: sp, funnel_stage: intent, ctr: 0.0470, cpc: 100, cvr: 0.0150, cpa: 6659,  n: 1, confidence: 0.35 }
+      - { media: gdn,           device: pc, funnel_stage: semi_intent, ctr: 0.0016, cpc: 83, cvr: 0.0134, cpa: 6220, n: 1, confidence: 0.35 }
+      - { media: gdn,           device: sp, funnel_stage: semi_intent, ctr: 0.0017, cpc: 61, cvr: 0.0095, cpa: 6355, n: 1, confidence: 0.35 }
+      - { media: yahoo_search,  device: pc, funnel_stage: intent, ctr: 0.0130, cpc: 93,  cvr: 0.0079, cpa: 11670, n: 1, confidence: 0.35 }
+      - { media: yahoo_search,  device: sp, funnel_stage: intent, ctr: 0.0245, cpc: 101, cvr: 0.0145, cpa: 6976,  n: 1, confidence: 0.35 }
+      # ↓ 出所はMediaForge/Vizury（いずれも現存しない媒体）。媒体名は採用せず、リタゲ=CPA最安の構造係数としてのみ保持。
+      - { media: retargeting,   device: pc,  funnel_stage: retargeting, ctr: 0.0018, cpc: 145, cvr: 0.0509, cpa: 2845, n: 1, confidence: 0.25, source_vendor_defunct: true }
+      - { media: retargeting,   device: all, funnel_stage: retargeting, ctr: 0.0010, cpc: 34,  cvr: 0.0152, cpa: 2262, n: 1, confidence: 0.25, source_vendor_defunct: true }
+    notes: "指名系KWはCTR14-16%/CVR2%超で別格。リタゲがCPA最安（出所媒体MediaForge/Vizuryは現存せず＝構造傾向の参考のみ、現行はGoogle/Meta等のリタゲに読み替え）。"
+
+  # --- 2. 自動車メディア・アプリ獲得（カーセンサー/Recruit, sim） --------------
+  - industry: app_install_automotive
+    source: { file: "Car Sensor App Promotion Simulation (MAX SIM)", year: 2015, type: sim }
+    aggregate: { ctr: 0.0035, cpc: 68, install_rate: 0.0492, cpi: 1392, cvr: 0.047, cpa: 29599 }
+    rows:
+      - { media: google_search, device: all, funnel_stage: intent, ctr: 0.0227, cpc: 93,  install_rate: 0.0544, cpi: 1706, cvr: 0.0585, cpa: 29188, n: 1, confidence: 0.35 }
+      - { media: yahoo_search,  device: all, funnel_stage: intent, ctr: 0.0109, cpc: 59,  install_rate: 0.0346, cpi: 1702, cvr: 0.0576, cpa: 29545, n: 1, confidence: 0.35 }
+      - { media: facebook,      device: all, funnel_stage: semi_intent, ctr: 0.0078, cpc: 161, install_rate: 0.1329, cpi: 1210, cvr: 0.0461, cpa: 26246, n: 1, confidence: 0.35 }
+      - { media: twitter,       device: all, funnel_stage: latent, ctr: 0.0044, cpc: 93,  install_rate: 0.0809, cpi: 1152, cvr: 0.0350, cpa: 32911, n: 1, confidence: 0.35 }
+      - { media: yahoo_infeed,  device: all, funnel_stage: latent, ctr: 0.0009, cpc: 50,  install_rate: 0.0445, cpi: 1124, cvr: 0.0430, cpa: 26123, n: 1, confidence: 0.35 }
+      - { media: smartnews,     device: all, funnel_stage: latent, ctr: 0.0053, cpc: 27,  install_rate: 0.0215, cpi: 1263, cvr: 0.0430, cpa: 29399, n: 1, confidence: 0.35 }
+      - { media: gdn,           device: all, funnel_stage: semi_intent, ctr: 0.0036, cpc: 56, install_rate: 0.0320, cpi: 1762, cvr: 0.0450, cpa: 39158, n: 1, confidence: 0.35 }
+      - { media: facebook_dpa,  device: all, funnel_stage: retargeting, ctr: 0.0521, cpc: 68, cvr: 0.0066, cpa: 10341, n: 1, confidence: 0.35, note: "リタゲ最安・install別計上" }
+    notes: "ニュース系はCPC激安/install率低、FBは高CPC/高install率。iOS/AndroidでCPI差。出所のGunosy行はdefunctのため除外。"
+
+  # --- 3. 証券・ネット証券（SBI証券/FullSpeed, 2015, sim＋要件） --------------
+  - industry: finance_securities
+    source: { file: "【SBI証券様】リスティング広告プラン Final.pptx", year: 2015, type: sim }
+    targets: { cpa_standard: 3000, cpa_nisa: 8000, kpi: "口座開設完了" }
+    rows:
+      - { media: google_search, device: all, funnel_stage: intent, segment: standard, ctr: 0.0014, cpc: 111, cvr: 0.0375, cpa: 2951, n: 1, confidence: 0.35 }
+      - { media: google_search, device: all, funnel_stage: intent, segment: nisa,     ctr: 0.0008, cpc: 158, cvr: 0.0207, cpa: 7606, n: 1, confidence: 0.35 }
+    notes: "高CPC帯。指名=低CPA青天井、BIG=高CPC独立制御。RLSA+動的検索で刈り取り拡張。"
+
+  # --- 4. ブライダル（ぐるなびWEDDING/FullSpeed, 2014, actual＋sim） ----------
+  - industry: bridal
+    source: { file: "ぐるなびWEDDING 冬の需要期プロモーションプラン.pptx", year: 2014, type: actual }
+    rows:
+      - { media: yahoo_search, device: pc, funnel_stage: intent, segment: bridal_fair, cpa: 18825, cpa_prev: 7527, n: 1, confidence: 0.45, note: "前年比でCPA悪化(actual)" }
+      - { media: yahoo_search, device: sp, funnel_stage: intent, segment: bridal_fair, cpc: 489, cpc_prev: 153, cpa: 31715, cpa_prev: 10538, cvr: 0.005, n: 1, confidence: 0.45, note: "SP CPC約3倍(actual)。順位低下でCTR崖落ち" }
+    notes: "SPは1-2位入札必須。CVR0.9%超で同予算CV倍。CPC¥100切りは困難。季節係数あり。"
+
+  # --- 5. 教育・専門学校（辻調理師専門学校/amana, 2023, actual＋sim）★新しい --
+  - industry: education_school
+    source: { file: "辻調理師専門学校 YouTube・gumgum 月次レビュー(2023/06)", year: 2023, type: actual }
+    objective: awareness_video
+    rows:
+      - { media: youtube, device: all, funnel_stage: latent, cpm: 778,  ctr: 0.0014, cpc: 573, view_through_rate: 0.4429, cpv: 1.8, n: 1, confidence: 0.55 }
+      - { media: gumgum,  device: all, funnel_stage: latent, cpm: 1500, ctr: 0.0115, cpc: 131, view_through_rate: 0.6551, cpv: 3.2, n: 1, confidence: 0.55 }
+      - { media: youtube, device: tv, funnel_stage: latent, cpm: 688, ctr: 0.0001, view_through_rate: 0.5596, cpv: 1.23, n: 1, confidence: 0.55, note: "TV=リーチ効率/高完全視聴" }
+      - { media: youtube, device: sp, funnel_stage: latent, cpm: 864, ctr: 0.0031, view_through_rate: 0.3831, cpv: 2.26, n: 1, confidence: 0.55, note: "SP=誘導(CTR高)" }
+    notes: "媒体simは保守的に外す(CPV sim¥5.3→実績¥1.8)＝simは弱い事前分布の根拠。"
+
+  # --- 6. 採用・人材（ラクス第二新卒/FullSpeed, 2014, sim） -------------------
+  - industry: recruiting
+    source: { file: "ラクス 御中 プロモーションのご提案.pdf", year: 2014, type: sim }
+    aggregate: { ctr: 0.0003, cpc: 109, cvr: 0.0055, cpa: 19873 }
+    rows:
+      - { media: dsp,          device: all, funnel_stage: latent,      ctr: 0.0005, cpc: 230, cvr: 0.0050, cpa: 45957, n: 1, confidence: 0.35, note: "Sphere発掘" }
+      - { media: yahoo_search, device: all, funnel_stage: retargeting, ctr: 0.0005, cpc: 68,  cvr: 0.0130, cpa: 5263,  n: 1, confidence: 0.35 }
+      - { media: google_search,device: all, funnel_stage: retargeting, ctr: 0.0010, cpc: 103, cvr: 0.0145, cpa: 7143,  n: 1, confidence: 0.35 }
+      - { media: ydn,          device: all, funnel_stage: latent,      ctr: 0.0001, cpc: 14,  cvr: 0.0003, cpa: 50000, n: 1, confidence: 0.35, note: "ブロード発掘" }
+    notes: "発掘は高CPA・刈り取りは低CPA＝ファネル段階×CPA勾配の実例。"
+
+  # --- 7. 分譲不動産ファネル（構造理解, sim）★エンジン構造の生きた例 ----------
+  - industry: real_estate_sale
+    source: { file: "構造理解（棟名×一般KW ファネル試算）", year: null, type: sim }
+    rows:
+      - { media: gdn,          device: all, funnel_stage: latent,      ctr: 0.0083, cpc: 25,  cvr: 0.0003,  cpa: 83333,  n: 1, confidence: 0.30, note: "カスタムインテント" }
+      - { media: facebook,     device: all, funnel_stage: latent,      ctr: 0.0100, cpc: 350, cvr: 0.0006,  cpa: 583333, n: 1, confidence: 0.30, note: "職業ターゲ" }
+      - { media: facebook,     device: all, funnel_stage: semi_intent, ctr: 0.0080, cpc: 200, cvr: 0.0012,  cpa: 166667, n: 1, confidence: 0.30, note: "CV類似" }
+      - { media: gdn,          device: all, funnel_stage: intent,      ctr: 0.0150, cpc: 90,  cvr: 0.00225, cpa: 40000,  n: 1, confidence: 0.30, note: "リタゲ深" }
+      - { media: google_search,device: all, funnel_stage: intent,      ctr: 0.0250, cpc: 300, cvr: 0.00225, cpa: 133333, n: 1, confidence: 0.30 }
+      - { media: seo,          device: all, funnel_stage: intent,      ctr: 0.0100, cpc: 0,   cvr: 0.0020,  cpa: 0,      n: 1, confidence: 0.30, note: "無料インベントリ" }
+    scenario_example:
+      base:      { total_cvr: 0.00101, monthly_cv: 10, avg_cpa: 102086, budget: 1000000 }
+      suumo_cvr: { total_cvr: 0.00284, monthly_cv: 27, avg_cpa: 36276,  budget: 1000000 }
+      budget_7m: { total_cvr: 0.00076, monthly_cv: 54, avg_cpa: 127446, budget: 7000000 }
+    notes: "潜在→顕在でCVR上昇。CVR改善が予算増よりCPAに効く＝感度分析の生例。"
+
+  # --- 8. EC・フォトブック会員登録（アスカネット/FullSpeed, 2014） -----------
+  - industry: ec_photobook
+    source: { file: "アスカネット 御中 2014年下期のご提案.pdf", year: 2014, type: actual }
+    targets: { cpa: 2500, kpi: "会員登録", market_size_jpy: 10000000000 }
+    notes: "認知imp増≠指名検索/CV増(実証)＝虚栄指標の反例。動画は少frequencyで認知立上げ。CVユーザー=25-44歳女性。"
+
+  # --- 9. BtoB SaaS・決済代行（ネットプロテクションズ/才流, 2022, actual）★新しい
+  - industry: btob_saas
+    source: { file: "ネットプロテクションズ 才流 第1/2回報告", year: 2022, type: actual }
+    site_cvr_by_channel:
+      organic:  { cvr: 0.0156, n: 1, confidence: 0.60 }
+      referral: { cvr: 0.0145, n: 1, confidence: 0.60 }
+      direct:   { cvr: 0.0084, n: 1, confidence: 0.60 }
+      paid:     { cvr: 0.0275, n: 1, confidence: 0.50 }
+      mail:     { cvr: 0.0273, n: 1, confidence: 0.50 }
+      site_overall: { cvr: 0.0131, n: 1, confidence: 0.60 }
+    form_funnel:
+      transition_rate: 0.0272
+      completion_rate: 0.1299
+      completion_rate_after_efo: 0.2262
+      completion_rate_target: 0.20
+      blog_organic_cvr: 0.0016
+    lp_cvr_by_device:
+      - { lp: main_listing, device: pc, cvr: 0.0162 }
+      - { lp: main_listing, device: sp, cvr: 0.0109 }
+      - { lp: mass_ad,      device: pc, cvr: 0.0023 }
+      - { lp: mass_ad,      device: sp, cvr: 0.0005, note: "マスLPは量多/CVR低" }
+    offline:
+      webinar: { signup: "50-300", attend_rate: "0.60-0.80", to_deal_rate: "0.05-0.10", new_lead_share: "0.20-0.30" }
+      expo:    { visitor_to_card: "0.05-0.10", card_to_deal: "0.10-0.20" }
+      whitepaper_fb_lead: { cpa_jpy: "5000-10000" }
+    benchmarks_general: { btob_site_cvr: "0.01-0.02", form_completion_ideal: 0.20 }
+
+  # --- 10. EC（自然検索）月別CVR（ECサイトトレンド, 2019-22, actual） ---------
+  - industry: ec_generic
+    source: { file: "ECサイトトレンド（G-Organic CVR推移）", year: "2019-2022", type: actual }
+    channel: organic
+    monthly_cvr_avg:   # 19-20年度平均CVR（比率）
+      "1": 0.00062
+      "2": 0.00056
+      "3": 0.00049
+      "4": 0.00067
+      "5": 0.00077
+      "6": 0.00076
+      "7": 0.00085
+      "8": 0.00057
+      "9": 0.00077
+      "10": 0.00063
+      "11": 0.00048
+      "12": 0.00036
+    notes: "7月ピーク/12月ボトム。季節係数は seasonality セクション参照。"
+
+# ============================================================================
+# 構造係数（業種横断の事前分布）— アロケの方向性に効く
+# ============================================================================
+structural_priors:
+  retargeting_cheapest:
+    rule: "リタゲ(deep/DPA/RLSA)はファネル下部で全業種CPA最安。アロケは下部から埋める。"
+    evidence: [real_estate_rental, app_install_automotive, recruiting, real_estate_sale]
+  funnel_cvr_gradient:
+    rule: "CVRは latent < semi_intent < intent < nomination の順で上昇、CPAは逆に低下。"
+    nomination_premium: "指名系KWはCTR/CVRが非指名の数倍(SBI,じげん)。"
+  media_profiles:
+    facebook:  { cpc: high, install_or_engage_rate: high }
+    news_feed: { media: [smartnews], cpc: very_low, cv_rate: low, note: "Gunosyは現存せず除外。ニュース系の傾向としてのみ保持。" }
+    video_tv:  { role: reach, view_through_rate: high }
+    video_sp:  { role: traffic, ctr: high }
+  sim_vs_actual:
+    rule: "媒体sim/提案試算は保守的に外れる。actualで上書きするまで弱い事前分布として扱う。"
+
+# ============================================================================
+# パイプライン・モデル（BtoB/リードgen向け：リード→商談→受注）
+# 出典：才流 ネットプロテクションズ(actual,2022)
+# ============================================================================
+pipeline_model:
+  stages: [session, form, lead, deal, win]
+  rates:
+    lead_to_deal: { low: 0.25, high: 0.30, type: actual, confidence: 0.55 }
+    deal_to_win:  { point: 0.20, type: actual, confidence: 0.55 }
+    cvr_decomposition: "CVR = transition_rate * completion_rate（フォーム遷移率×完了率）"
+  cv_point_to_deal:
+    inquiry: { low: 0.60, high: 0.80 }
+    doc_request: 0.30
+  awareness_payback:
+    rule: "認知施策なしは顕在のみ刈り取りで途中からCPA高騰。認知ありは初期CPA高いが長期CAC逓減。"
+    use: "回収期間(Payback Period)付きで提示。短期CPA悪化と長期改善を分けて表示。"
+  page_level_cvr_causality:    # ナビ露出の取捨選択（観察的因果, actual）
+    positive: [{ page: price, lift: 2.06 }, { page: merit, lift: 1.71 }, { page: function, lift: 1.51 }]
+    negative: [{ page: case, lift: 0.16 }, { page: news, lift: 0.31 }]
+    caveat: "観察データの交絡に注意。確信度併記、可能ならA/Bで確認。"
+
+# ============================================================================
+# 季節係数（月次）— アロケの時間軸
+# 出典：ECサイトトレンド(actual)。CVRに連動した予算配分比率。
+# ============================================================================
+seasonality:
+  ec_generic_organic:
+    source: { file: "ECサイトトレンド", year: "2019-2022", type: actual }
+    rule: "CVRが高い月に厚く張る（CVR連動配分）。業種で季節パターンは差し替え。"
+    budget_allocation_ratio:   # 年間予算を月配分（合計≒100%）
+      "1": 0.0830
+      "2": 0.0745
+      "3": 0.0651
+      "4": 0.0892
+      "5": 0.1018
+      "6": 0.1016
+      "7": 0.1128
+      "8": 0.0755
+      "9": 0.1018
+      "10": 0.0832
+      "11": 0.0637
+      "12": 0.0476
+  bridal:
+    rule: "冬の需要期(11-1月)に向けCPC上昇・CVR変動。季節プロモと連動。"
+    source: { file: "ぐるなびWEDDING", year: 2014, type: actual }
+
+# ============================================================================
+# フォールバック
+# ============================================================================
+generic_fallback:
+  rule: "該当industryのベンチが無い場合、最も近いindustry＋generic値を使い、確信度を下げ区間を広げる。必ず『汎用ベンチで推定』と明示。"
+
+# ============================================================================
+# エンジン運用係数（オーナー確認前シード）
+# 既存資料に直接ない「frequency / audience_size / 学習閾値 / 目的重み」は
+# 実データ接続前のメカニズム検証用としてここに隔離する。コードには埋め込まない。
+# ============================================================================
+engine_defaults:
+  source: { file: "Tact engine seed defaults", year: 2026, type: sim }
+  channel_classes:
+    search:
+      media: [google_search, yahoo_search]
+      frequency: 1.2
+      audience_size: 150000
+      cpm: 950
+      ctr: 0.018
+      cvr: 0.018
+      aov: 12000
+      response_k_ratio: 0.65
+      search_demand_conversions: 320
+      search_is_cap: 0.75
+      min_test_share: 0.08
+    social:
+      media: [facebook, twitter, facebook_dpa]
+      frequency: 3.2
+      audience_size: 260000
+      cpm: 780
+      ctr: 0.007
+      cvr: 0.006
+      aov: 9000
+      response_k_ratio: 0.90
+      min_test_share: 0.10
+    display:
+      media: [gdn, ydn, dsp, yahoo_infeed, smartnews, gumgum, youtube]
+      frequency: 4.5
+      audience_size: 420000
+      cpm: 520
+      ctr: 0.0025
+      cvr: 0.002
+      aov: 7000
+      response_k_ratio: 1.15
+      min_test_share: 0.10
+    retargeting:
+      media: [retargeting, facebook_dpa]
+      frequency: 5.0
+      audience_size: 45000
+      cpm: 900
+      ctr: 0.010
+      cvr: 0.025
+      aov: 10000
+      response_k_ratio: 0.55
+      min_test_share: 0.05
+  objective_profiles:
+    conversion: { value: 0.55, conversions: 0.35, reach: 0.10 }
+    lead_generation: { conversions: 0.65, value: 0.20, reach: 0.15 }
+    traffic: { sessions: 0.70, conversions: 0.20, reach: 0.10 }
+    awareness: { reach: 0.75, sessions: 0.20, conversions: 0.05 }
+    local_visits: { conversions: 0.50, reach: 0.30, sessions: 0.20 }
+    app_promotion: { conversions: 0.55, sessions: 0.25, reach: 0.20 }
+    efficiency: { value: 0.45, conversions: 0.40, reach: 0.15 }
+  attribution_models:
+    last_click: { search: 1.20, social: 0.90, display: 0.85, retargeting: 1.15 }
+    linear: { search: 1.00, social: 1.00, display: 1.00, retargeting: 1.00 }
+    position_based: { search: 1.08, social: 1.02, display: 0.96, retargeting: 1.05 }
+    data_driven: { search: 1.05, social: 1.00, display: 0.98, retargeting: 1.06 }
+  scenario_multipliers:
+    conservative: { ctr: 0.90, cvr: 0.82, cpm: 1.12, aov: 0.92 }
+    standard: { ctr: 1.00, cvr: 1.00, cpm: 1.00, aov: 1.00 }
+    strong: { ctr: 1.12, cvr: 1.22, cpm: 0.92, aov: 1.08 }
+  measurement_snapshot:
+    delivery_ratio: 0.36
+    series_points: 8
+    missing_point_index: 3
+  feasibility:
+    facebook_min_cv_per_week: 50
+    facebook_ideal_cv_per_day: 15
+    lookalike_min_seed: 100
+    display_max_frequency: 7.0
+    search_min_impression_share: 0.20

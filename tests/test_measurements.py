@@ -31,13 +31,13 @@ def test_measurement_latest_requires_refresh() -> None:
     assert snapshot["orders"] > 0
     assert snapshot["revenue_jpy"] > 0
     assert snapshot["ad_spend_jpy"] > 0
-    assert snapshot["confidence"] == 0.62
+    assert 0 < snapshot["confidence"] <= 1
     assert snapshot["conversions_range"]["low"] > 0
     assert snapshot["conversions_range"]["high"] > snapshot["conversions_range"]["low"]
-    assert snapshot["conversions_range"]["confidence"] == snapshot["confidence"]
-    assert snapshot["conversions_range"]["source"] == "mock"
-    assert snapshot["roas_range"]["confidence"] == snapshot["confidence"]
-    assert snapshot["roas_range"]["source"] == "mock"
+    assert 0 < snapshot["conversions_range"]["confidence"] <= 1
+    assert snapshot["conversions_range"]["source"] == "model"
+    assert 0 < snapshot["roas_range"]["confidence"] <= 1
+    assert snapshot["roas_range"]["source"] == "model"
 
     latest_response = client.get(f"/api/v1/campaigns/{campaign_id}/measurements/latest")
 

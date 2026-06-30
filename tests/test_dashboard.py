@@ -23,11 +23,11 @@ def test_dashboard_returns_honest_empty_metrics_before_measurement() -> None:
     assert kpis["roas"]["value"] is None
     assert kpis["conversions"]["value"] is None
     assert kpis["cpa_jpy"]["value"] > 0
-    assert kpis["cpa_jpy"]["source"] == "media_plan_mock"
+    assert kpis["cpa_jpy"]["source"] == "media_plan_model"
     assert kpis["cpa_jpy"]["data_kind"] == "simulated"
 
     for row in dashboard["channels"]:
-        assert row["planned_budget_jpy"]["source"] == "media_plan_mock"
+        assert row["planned_budget_jpy"]["source"] == "media_plan_model"
         assert row["planned_budget_jpy"]["value"] > 0
         assert row["ad_spend_jpy"]["value"] is None
         assert row["ad_spend_jpy"]["status"] == "measurement_pending"
