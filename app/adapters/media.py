@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from app.domain.allocation import AllocationResult, allocate_media_budget
 from app.models.estimation import EstimateRange
 
 
@@ -29,6 +29,7 @@ class MediaPlanRequest(BaseModel):
     total_budget_jpy: int = Field(gt=0)
     target_audience: str
     channels: list[str]
+    brand_factor: float = Field(default=1.0, gt=0, le=2.0)
 
 
 class MediaPlanResponse(BaseModel):
@@ -107,134 +108,76 @@ class MediaAdapter(ABC):
         """Fetch delivery status for kill-switch evaluation."""
 
 
-@dataclass(frozen=True)
-class ObjectiveStrategy:
-    channel_weights: dict[str, int]
-    optimization_metric: str
-    bid_strategy: str
-    reach_multiplier: float
-    cpa_divisor: int
-
-
-_DEFAULT_OBJECTIVE_STRATEGY = ObjectiveStrategy(
-    channel_weights={"search": 40, "social": 35, "display": 25},
-    optimization_metric="conversions",
-    bid_strategy="maximize_conversions",
-    reach_multiplier=3.0,
-    cpa_divisor=120,
-)
-
-_OBJECTIVE_STRATEGIES = {
-    "conversion": ObjectiveStrategy(
-        channel_weights={"search": 45, "social": 35, "display": 20},
-        optimization_metric="conversion_value",
-        bid_strategy="target_roas",
-        reach_multiplier=2.7,
-        cpa_divisor=105,
-    ),
-    "lead_generation": ObjectiveStrategy(
-        channel_weights={"search": 50, "social": 35, "display": 15},
-        optimization_metric="qualified_leads",
-        bid_strategy="target_cpa",
-        reach_multiplier=2.8,
-        cpa_divisor=130,
-    ),
-    "traffic": ObjectiveStrategy(
-        channel_weights={"search": 40, "display": 35, "social": 25},
-        optimization_metric="clicks",
-        bid_strategy="maximize_clicks",
-        reach_multiplier=4.2,
-        cpa_divisor=170,
-    ),
-    "awareness": ObjectiveStrategy(
-        channel_weights={"display": 50, "social": 35, "search": 15},
-        optimization_metric="reach",
-        bid_strategy="target_cpm",
-        reach_multiplier=5.4,
-        cpa_divisor=220,
-    ),
-    "local_visits": ObjectiveStrategy(
-        channel_weights={"search": 55, "display": 30, "social": 15},
-        optimization_metric="store_visits",
-        bid_strategy="maximize_conversions",
-        reach_multiplier=3.1,
-        cpa_divisor=115,
-    ),
-    "app_promotion": ObjectiveStrategy(
-        channel_weights={"social": 50, "display": 30, "search": 20},
-        optimization_metric="installs",
-        bid_strategy="target_cpa",
-        reach_multiplier=3.8,
-        cpa_divisor=145,
-    ),
-    "efficiency": ObjectiveStrategy(
-        channel_weights={"search": 45, "social": 30, "display": 25},
-        optimization_metric="cpa_jpy",
-        bid_strategy="target_cpa",
-        reach_multiplier=2.6,
-        cpa_divisor=150,
-    ),
-}
-
-
 class MockMediaAdapter(MediaAdapter):
-    """Deterministic media API adapter for MVP development."""
+    """Deterministic media API adapter backed by the pure domain engine."""
 
     async def create_plan(self, request: MediaPlanRequest) -> MediaPlanResponse:
         channels = request.channels or ["search", "social"]
-        strategy = _objective_strategy(request.objective)
-        budgets = _allocate_budget(
-            request.total_budget_jpy,
-            channels,
-            strategy.channel_weights,
+        allocation = allocate_media_budget(
+            total_budget_jpy=request.total_budget_jpy,
+            channels=channels,
+            objective=request.objective,
+            target_audience=request.target_audience,
+            campaign_name=request.campaign_name,
+            month=datetime.now(tz=UTC).month,
+            brand_factor=request.brand_factor,
         )
 
         placements: list[MediaPlacement] = []
-        for channel, budget in zip(channels, budgets, strict=True):
+        for item in allocation.items:
+            benchmark = item.simulation.assumption.source_payload()
             placements.append(
                 MediaPlacement(
-                    channel=channel,
-                    budget_jpy=budget,
+                    channel=item.channel,
+                    budget_jpy=item.budget_jpy,
                     objective=request.objective,
                     targeting={
                         "audience": request.target_audience,
+                        "industry": allocation.industry,
+                        "media": item.simulation.media,
+                        "funnel_stage": item.simulation.assumption.funnel_stage,
                         "keywords": [
                             request.campaign_name,
                             request.objective,
-                            strategy.optimization_metric,
-                            channel,
+                            _optimization_metric(request.objective),
+                            item.channel,
                         ],
                     },
                     creative_spec={
                         "format": "responsive",
                         "primary_text_max_chars": "120",
-                        "asset_policy": "mock-validation-only",
-                        "optimization_metric": strategy.optimization_metric,
-                        "bid_strategy": strategy.bid_strategy,
+                        "asset_policy": "validation-only",
+                        "optimization_metric": _optimization_metric(request.objective),
+                        "bid_strategy": _bid_strategy(request.objective),
+                        "bullseye_status": item.bullseye_status,
+                        "source_file": str(benchmark["file"]),
+                        "source_type": str(benchmark["type"]),
+                        "engine_default_metrics": ", ".join(
+                            str(metric)
+                            for metric in item.simulation.source.get("engine_defaults", [])
+                        ),
+                        "seasonality_basis": str(
+                            (
+                                item.simulation.source.get("seasonality")
+                                if isinstance(item.simulation.source.get("seasonality"), dict)
+                                else {}
+                            ).get("basis", "not_applied")
+                        ),
+                        "rationale": " / ".join(item.reasons),
+                        "warnings": " / ".join(item.warnings),
                     },
                 )
             )
 
-        estimated_reach = max(1000, round(request.total_budget_jpy * strategy.reach_multiplier))
-        estimated_cpa = max(100, round(request.total_budget_jpy / strategy.cpa_divisor))
-        channel_uncertainty = min(0.28, 0.16 + (0.02 * max(0, len(channels) - 1)))
-
         return MediaPlanResponse(
-            request_id=f"media_plan_mock_{uuid4().hex}",
+            request_id=f"media_plan_model_{uuid4().hex}",
             account_id=request.account_id,
+            source="model",
             placements=placements,
-            estimated_reach=estimated_reach,
-            estimated_reach_range=_estimate_range(
-                estimated_reach,
-                uncertainty=channel_uncertainty,
-                confidence=0.58,
-            ),
-            estimated_cpa_jpy=estimated_cpa,
-            estimated_cpa_jpy_range=_estimate_range(
-                estimated_cpa,
-                uncertainty=channel_uncertainty + 0.04,
-                confidence=0.54,
-            ),
+            estimated_reach=max(0, round(allocation.estimated_reach)),
+            estimated_reach_range=_range_from_interval(allocation, metric="reach"),
+            estimated_cpa_jpy=max(0, round(allocation.estimated_cpa_jpy)),
+            estimated_cpa_jpy_range=_range_from_interval(allocation, metric="cpa"),
             generated_at=datetime.now(tz=UTC),
         )
 
@@ -279,40 +222,39 @@ class MockMediaAdapter(MediaAdapter):
         )
 
 
-def _estimate_range(value: float, *, uncertainty: float, confidence: float) -> EstimateRange:
+def _range_from_interval(
+    allocation: AllocationResult,
+    *,
+    metric: Literal["reach", "cpa"],
+) -> EstimateRange:
+    interval = allocation.reach_range if metric == "reach" else allocation.cpa_range
     return EstimateRange(
-        low=round(value * (1 - uncertainty), 2),
-        high=round(value * (1 + uncertainty), 2),
-        confidence=confidence,
-        source="mock",
+        low=round(interval.low, 2),
+        high=round(interval.high, 2),
+        confidence=round(interval.confidence, 4),
+        source="model",
     )
 
 
-def _objective_strategy(objective: str) -> ObjectiveStrategy:
-    return _OBJECTIVE_STRATEGIES.get(objective, _DEFAULT_OBJECTIVE_STRATEGY)
+def _optimization_metric(objective: str) -> str:
+    return {
+        "conversion": "conversion_value",
+        "lead_generation": "qualified_leads",
+        "traffic": "clicks",
+        "awareness": "reach",
+        "local_visits": "store_visits",
+        "app_promotion": "installs",
+        "efficiency": "cpa_jpy",
+    }.get(objective, "conversions")
 
 
-def _allocate_budget(
-    total_budget_jpy: int,
-    channels: list[str],
-    weights: dict[str, int],
-) -> list[int]:
-    if not channels:
-        return []
-    channel_weights = [max(0, weights.get(channel, 1)) for channel in channels]
-    if sum(channel_weights) == 0:
-        channel_weights = [1 for _ in channels]
-    total_weight = sum(channel_weights)
-    raw_allocations = [
-        (total_budget_jpy * weight) / total_weight for weight in channel_weights
-    ]
-    budgets = [int(allocation) for allocation in raw_allocations]
-    remainder = total_budget_jpy - sum(budgets)
-    fractional_order = sorted(
-        range(len(raw_allocations)),
-        key=lambda index: raw_allocations[index] - budgets[index],
-        reverse=True,
-    )
-    for index in fractional_order[:remainder]:
-        budgets[index] += 1
-    return budgets
+def _bid_strategy(objective: str) -> str:
+    return {
+        "conversion": "target_roas",
+        "lead_generation": "target_cpa",
+        "traffic": "maximize_clicks",
+        "awareness": "target_cpm",
+        "local_visits": "maximize_conversions",
+        "app_promotion": "target_cpa",
+        "efficiency": "target_cpa",
+    }.get(objective, "maximize_conversions")

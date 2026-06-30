@@ -49,23 +49,23 @@ const viewSignatures = new Map<string, string>();
 const dashboardFilterStorageKey = "tact-dashboard-filters";
 
 const productPlaceholderExamples = [
-  "法人向け勤怠管理ツール",
-  "製造業向けIoTセンサー",
+  "勤怠管理ツール",
+  "IoTセンサー",
   "人材紹介サービス",
-  "地域密着の歯科クリニック",
-  "オンライン英会話サービス",
-  "D2C冷凍弁当ブランド",
-  "注文住宅の工務店",
-  "相続に強い会計事務所",
+  "歯科クリニック",
+  "英会話サービス",
+  "冷凍弁当",
+  "住宅工務店",
+  "会計事務所",
   "中古車販売店",
-  "法人向けセキュリティ診断",
+  "セキュリティ診断",
   "不動産投資スクール",
-  "24時間フィットネスジム",
-  "ECモールの季節商品",
-  "クラフトビール専門店",
-  "マーケター向けウェビナー",
-  "業務効率化SaaS",
-  "地方ホテルの宿泊プラン",
+  "フィットネスジム",
+  "ギフト商品",
+  "ビールショップ",
+  "ウェビナー",
+  "業務管理SaaS",
+  "ホテル宿泊プラン",
   "資格取得スクール",
   "医療機器メーカー",
   "家計簿アプリ",
@@ -910,7 +910,7 @@ function renderCreative(): void {
         .join("")}
     </div>
     <div class="out in">
-      <h3>成果の目安 <span class="data-label forecast">予測 / テスト用</span></h3>
+      <h3>成果の目安 <span class="data-label forecast">予測 / 自動推定</span></h3>
       <div class="kpi-row">
         ${metricCell("届く人数の目安", reach.value, reach.sub)}
         ${metricCell("1件あたり費用の目安", cpa.value, cpa.sub)}
@@ -1445,6 +1445,7 @@ function sourceText(source: string, dataKind: string | null): string {
   if (isDemoMode) return "テスト用";
   if (source === "ga4_shopify") return "実データ";
   if (source === "media_plan_mock") return "テスト用";
+  if (source === "media_plan_model") return "自動推定";
   if (source === "ga4_shopify_mock" || source === "mock_media") return "テスト用";
   if (dataKind === "measured") return "実データ";
   return "自動推定";
@@ -2163,7 +2164,7 @@ function formToBrief(): CampaignBrief {
   return {
     name: product,
     objective: objective.id,
-    target_audience: "Tact UI generated audience",
+    target_audience: "未指定",
     total_budget_jpy: budget,
     channels: objective.channels,
     kpis: objective.kpis,

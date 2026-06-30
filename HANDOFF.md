@@ -4,93 +4,119 @@
 
 Repo: `synergia-yoshi/Tact`
 Local path: `C:\dev\repos\Tact`
-Branch: `codex/ms6-production-hardening`
-Base: `origin/codex/responsive-netlify-demo` / PR #16
-Draft PR: `https://github.com/synergia-yoshi/Tact/pull/17`
+Branch: `codex/engine-simulation-allocation`
+Base: stacked on `codex/ms6-production-hardening`
+Source spec:
+`C:\dev\Obsidian\10_Projects\Tact\2026-06-30-Codex-engine-simulation-allocation-spec.md`
+Scope handoff:
+`C:\dev\Obsidian\10_Projects\Tact\2026-06-30-Codex-engine-handoff-implementable.md`
 
-This branch starts MS6 production hardening from
-`2026-06-30-Codex-MS6-production-hardening.md`. It is intentionally a footing
-pass: GCP provisioning is still owner work, while app code, config guards,
-tests, and deployment handoff docs are added here.
+This branch implements the pure domain engine for simulation estimates and
+media allocation. It replaces the old placeholder media and measurement mock
+constants with deterministic calculations sourced from `app/domain/benchmarks.yaml`.
 
 ## 2. What Changed
 
-- Added `AUTH_MODE=oidc` configuration.
-- Added a dependency-free RS256/JWKS JWT verifier in `app/oidc.py`.
-  It validates `iss`, `aud`, `exp`, `iat`, `nbf`, maximum token age, key
-  selection by `kid`, and signature integrity.
-- Hardened signed bearer tokens with `iat`, `nbf`, `jti`, `iss`, and `aud`.
-- Added optional signed-token replay rejection via `AUTH_REPLAY_PROTECTION`.
-- Production is now fail-closed:
-  `APP_ENV=production` requires `AUTH_MODE=oidc` plus complete OIDC and IAP
-  settings.
-- Added IAP assertion verification hook before bearer/OIDC auth.
-- Added production security headers: CSP, HSTS, Referrer-Policy,
-  X-Content-Type-Options, and X-Frame-Options.
-- Added audit payload masking for secret-like keys and email addresses.
-- Changed Firestore audit append footing to create-if-absent instead of
-  blind `set`, so existing audit entry IDs are not overwritten.
-- Normalized legal findings with `category`, `severity`
-  (`info`/`warning`/`blocking`), `normalized_term`, and `rationale`.
-- Added `deploy/cloud-run-service.yaml` skeleton for Cloud Run behind IAP.
-- Added handoff instructions for IAP/Cloud Run and Google Drive plaintext-key
-  migration.
+- Added `app/domain/benchmarks.yaml` from the Obsidian seed and isolated
+  engine-only seed defaults for frequency, audience size, objective weights,
+  attribution weights, scenario multipliers, and learning thresholds.
+- Added pure domain modules:
+  - `app/domain/benchmarks.py`
+  - `app/domain/simulation.py`
+  - `app/domain/pipeline.py`
+  - `app/domain/allocation.py`
+  - `app/domain/uncertainty.py`
+- Implemented funnel simulation:
+  `imp = spend / CPM * 1000`, reach with frequency saturation, clicks, sessions,
+  conversions, revenue, CPA, and ROAS.
+- Implemented three saturation guards:
+  concave response, finite-audience frequency saturation, and search
+  impression-share hard cap.
+- Implemented BtoB pipeline calculation:
+  `session -> form -> lead -> deal -> win`, with `CVR = transition * completion`
+  and downstream sales yields.
+- Implemented allocation by greedy marginal score equalization with objective
+  weights, attribution model weights, seasonality, Bullseye status, reasons,
+  and feasibility warnings.
+- Implemented uncertainty ranges as 95% prediction intervals using source type,
+  age, confidence seed, `sd`, and `n`. The old fixed confidence value is gone.
+- Added review follow-up disclosure for owner-unconfirmed structural engine
+  defaults, including metric-level `engine_default` sources, low confidence, and
+  explicit default keys in simulation payloads.
+- Switched EC seasonality to prefer `monthly_cvr_avg` when available, with
+  budget-ratio seasonality retained only as a documented fallback basis.
+- Exposed `brand_factor` through media allocation requests and allocation source
+  payloads.
+- Moved objective score session/reach unit values from code heuristics into
+  `benchmarks.yaml` engine defaults.
+- Widened prediction intervals for stale `sim` seeds with tiny `n`.
+- Replaced `MockMediaAdapter.create_plan` placeholder budget/reach/CPA logic with
+  the domain allocation engine.
+- Replaced `MockMeasurementAdapter.fetch_snapshot` hash-derived mock metrics with
+  domain allocation/simulation outputs.
+- Added `media_plan_model` as a dashboard metric source and updated UI labels to
+  show model estimates as "auto estimate" instead of mock test data.
+- Added domain tests for funnel arithmetic, saturation, allocation, pipeline,
+  uncertainty convergence, scenarios, sensitivity, feasibility, and defunct media.
 
 ## 3. Current State
 
 Working:
 
-- Local/dev compatibility is preserved: `disabled` and `signed_bearer` still
-  work outside production.
-- Production settings reject `disabled` and `signed_bearer`.
-- OIDC verifier attack tests cover expired, future `nbf`, tampering, wrong
-  issuer, and wrong audience.
-- Signed bearer tests cover future `nbf`, wrong issuer/audience, and duplicate
-  `jti` replay rejection.
-- Legal blocking/warning results are structured and existing publish flow still
-  requires `passed` before approval request.
-- Audit payloads redact obvious secrets and emails before persistence.
+- Existing campaign proposal, dashboard, publish-gate, role, audit, legal, and
+  kill-switch flows are preserved.
+- Media plan estimates now return `source="model"` and estimate ranges with
+  `source="model"`.
+- Dashboard planned metrics use `media_plan_model`.
+- Defunct media from the seed (`mediaforge`, `vizury`, `gunosy`) are filtered out
+  of active allocation candidates.
+- Every domain result carries benchmark source payloads and formulas.
+- Every simulation result now separates benchmark metric sources, derived
+  metrics, and owner-unconfirmed engine defaults.
+- Demo build output was regenerated with `VITE_DEMO_MODE=1`.
 
 Still owner/manual:
 
-- Creating the IdP tenant, Cloud Run service, IAP backend, IAM bindings, and
-  Secret Manager resources.
-- Rotating and removing any plaintext API keys from Google Drive.
-- Wiring production structured logs to the target logging backend.
+- Benchmark values remain owner-unconfirmed seeds, not definitive market facts.
+- Real OAuth/API data connections are still out of scope for this branch.
+- Bayesian updating from company actuals is not implemented yet.
+- UI/IA for exposing the full reasoning payload is still minimal.
 
 ## 4. Validation
 
-- `.\.venv312\Scripts\python.exe -m pytest` passed: 59 tests.
+- `.\.venv312\Scripts\python.exe -m pytest -q` passed: 68 tests.
 - `.\.venv312\Scripts\python.exe -m ruff check .` passed.
-- `npm run test` passed:
-  TypeScript typecheck and Vitest.
+- `npm run test` passed: TypeScript typecheck and Vitest.
 - `npm run test:e2e` passed: 5 Playwright tests.
+- `VITE_DEMO_MODE=1 npm run build:demo` passed.
 - `git diff --check` passed.
+- `rg "0\.62" app tests -n` returned no matches.
 
 Known warning: FastAPI/Starlette TestClient emits the existing `httpx2`
-deprecation warning only.
+deprecation warning only. `git diff --check` also prints Windows CRLF conversion
+warnings, but no whitespace errors.
 
-## 5. Assumptions Made
+## 5. PR Checklist Draft
 
-- PR split remains:
-  - #12: MS2 Vite vertical slice
-  - #13: MS2.5-MS3.5 UI/generation experience
-  - #14: MS4 rich dashboard
-  - #15: MS5 role separation
-  - #16: responsive + Netlify static demo
-  - #17: MS6 production hardening footing
-- Firestore transaction hardening is started with create-if-absent behavior;
-  the production SDK transaction decorator should be wired after a real
-  Firestore integration pass.
-- Signed bearer replay protection is optional so current local/dev multi-request
-  UI sessions keep working.
+- [x] `app/domain/{simulation,allocation,uncertainty,pipeline}.py` exists.
+- [x] `app/domain/benchmarks.yaml` exists and includes seed source metadata.
+- [x] Old media plan placeholder reach/CPA/budget logic is replaced.
+- [x] Old measurement hash/fixed-confidence mock logic is replaced.
+- [x] Saturation mechanisms are covered by tests.
+- [x] Allocation sums to total budget and changes with objective.
+- [x] Prediction intervals narrow as `n` increases.
+- [x] Pipeline yield math is covered by tests.
+- [x] Feasibility warnings are covered by tests.
+- [x] Defunct media are not active allocation candidates.
+- [x] Scenario, sensitivity, and next-action outputs are covered by tests.
 
 ## 6. Next Work
 
-1. Wire real Firestore transaction retries around audit append using the Google
-   Cloud client transaction API.
-2. Decide staging behavior for `AUTH_REPLAY_PROTECTION`.
-3. Add production structured logging sinks for auth failure, 403, Kill,
-   approval, role change, and legal blocking events.
-4. Provision IdP/IAP/Cloud Run/Secret Manager using
-   `deploy/cloud-run-service.yaml` as the skeleton.
+1. Have the owner review the benchmark seed values and wording before treating
+   them as business-facing assumptions.
+2. Add a richer API shape for exposing allocation reasons, scenario summaries,
+   sensitivity, and feasibility warnings to the UI.
+3. Connect GA4, Shopify, and media platform actuals, then update the interval
+   model with real observed data.
+4. Add Bayesian update / actual-overrides logic once real measurements are
+   available.

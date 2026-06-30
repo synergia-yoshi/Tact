@@ -13,6 +13,7 @@ MetricSource = Literal[
     "ga4_shopify_mock",
     "ga4_shopify",
     "media_plan_mock",
+    "media_plan_model",
     "mock_media",
 ]
 

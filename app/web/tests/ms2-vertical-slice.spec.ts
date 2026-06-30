@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function fillRequiredBrief(
   page: Page,
-  product = "法人向け勤怠管理ツール",
+  product = "勤怠管理ツール",
 ): Promise<void> {
   await page.locator("#product-input").fill(product);
 }
@@ -46,7 +46,8 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   );
   await page.getByRole("button", { name: /広告案を作成する/ }).click();
   const proposal = await proposalResponsePromise.then((response) => response.json());
-  expect(proposal.brief.name).toBe("法人向け勤怠管理ツール");
+  expect(proposal.brief.name).toBe("勤怠管理ツール");
+  expect(proposal.brief.target_audience).toBe("未指定");
   expect(proposal.brief.objective).toBe("awareness");
   expect(proposal.brief.kpis).toContain("reach");
   expect(proposal.brief.total_budget_jpy).toBe(5_000_000);
@@ -68,18 +69,20 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   const creativeView = page.locator("#view-creative");
   await expect(creativeView.getByText("テスト用の案 / 広告文")).toBeVisible();
   await expect(
-    creativeView.getByText("予測 / テスト用", { exact: true }),
+    creativeView.getByText("予測 / 自動推定", { exact: true }),
   ).toBeVisible();
   await expect(creativeView.getByText("実際に終わった作業だけ表示")).toBeVisible();
   await expect(creativeView.getByText("見せかけなし")).toBeVisible();
-  await expect(creativeView.getByText("テスト用の数字").first()).toBeVisible();
+  await expect(creativeView.getByText("自動推定").first()).toBeVisible();
   await expect(creativeView.getByText("認知拡大")).toBeVisible();
   await expect(creativeView.getByText("表示回数・リーチ・CPM を見て、媒体配分を組みます。")).toBeVisible();
   await expect(creativeView.locator(".generation-step.complete")).toHaveCount(3);
   const reachConfidence = Math.round(
     proposal.media_plan.estimated_reach_range.confidence * 100,
   );
-  await expect(creativeView.getByText(`確かさ ${reachConfidence}%`)).toBeVisible();
+  await expect(
+    creativeView.getByText(`届く人数の目安 / 自動推定 / 確かさ ${reachConfidence}%`),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "成果" }).click();
   await expect(page.getByText("計測が入るまで、成果のグラフは表示しません。")).toBeVisible();
@@ -151,8 +154,9 @@ test("admin-only audit verification is surfaced in the UI", async ({ page }) => 
 
   await fillRequiredBrief(page);
   await page.getByRole("button", { name: /広告案を作成する/ }).click();
+  await expect(page.locator("#creative-title")).toBeVisible();
   await page.getByRole("button", { name: "記録" }).click();
-  await expect(page.getByText("変更できない操作記録")).toBeVisible();
+  await expect(page.locator("#view-audit").getByText("変更できない操作記録")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "記録を検証" })).toBeDisabled();
 
