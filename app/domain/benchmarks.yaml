@@ -255,7 +255,12 @@ generic_fallback:
 # 実データ接続前のメカニズム検証用としてここに隔離する。コードには埋め込まない。
 # ============================================================================
 engine_defaults:
-  source: { file: "Tact engine seed defaults", year: 2026, type: sim }
+  source: { file: "Tact engine seed defaults", year: 2026, type: sim, data_kind: engine_default }
+  confidence: 0.25
+  note: "frequency / audience_size / response_k_ratio / objective score unit values are owner-unconfirmed structural defaults for mechanism validation, not market facts."
+  objective_score_unit_values:
+    sessions_value_ratio: 0.02   # session score unit = aov * ratio
+    reach_value_ratio: 0.001     # reach score unit = aov * ratio
   channel_classes:
     search:
       media: [google_search, yahoo_search]

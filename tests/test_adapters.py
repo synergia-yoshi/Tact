@@ -37,6 +37,8 @@ async def test_mock_media_plan_and_publish_use_media_api_shape() -> None:
     assert {placement.channel for placement in plan.placements} == {"search", "social"}
     assert plan.placements[0].creative_spec["optimization_metric"] == "qualified_leads"
     assert plan.placements[0].creative_spec["bid_strategy"] == "target_cpa"
+    assert plan.placements[0].creative_spec["engine_default_metrics"]
+    assert plan.placements[0].creative_spec["seasonality_basis"]
     assert plan.estimated_reach_range is not None
     assert plan.estimated_reach_range.source == "model"
 

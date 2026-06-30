@@ -29,6 +29,7 @@ class MediaPlanRequest(BaseModel):
     total_budget_jpy: int = Field(gt=0)
     target_audience: str
     channels: list[str]
+    brand_factor: float = Field(default=1.0, gt=0, le=2.0)
 
 
 class MediaPlanResponse(BaseModel):
@@ -119,6 +120,7 @@ class MockMediaAdapter(MediaAdapter):
             target_audience=request.target_audience,
             campaign_name=request.campaign_name,
             month=datetime.now(tz=UTC).month,
+            brand_factor=request.brand_factor,
         )
 
         placements: list[MediaPlacement] = []
@@ -150,6 +152,17 @@ class MockMediaAdapter(MediaAdapter):
                         "bullseye_status": item.bullseye_status,
                         "source_file": str(benchmark["file"]),
                         "source_type": str(benchmark["type"]),
+                        "engine_default_metrics": ", ".join(
+                            str(metric)
+                            for metric in item.simulation.source.get("engine_defaults", [])
+                        ),
+                        "seasonality_basis": str(
+                            (
+                                item.simulation.source.get("seasonality")
+                                if isinstance(item.simulation.source.get("seasonality"), dict)
+                                else {}
+                            ).get("basis", "not_applied")
+                        ),
                         "rationale": " / ".join(item.reasons),
                         "warnings": " / ".join(item.warnings),
                     },

@@ -103,9 +103,13 @@ def simulate_channel(
     roas = revenue / spend if spend > 0 else 0
     source = {
         "benchmark": assumption.source_payload(),
+        "metric_sources": assumption.metric_sources,
+        "engine_defaults": assumption.source_payload()["engine_default_metrics"],
         "seasonality": seasonality_source,
         "scenario": scenario,
         "objective": objective,
+        "brand_factor": brand_factor,
+        "overrides": sorted((metric_overrides or {}).keys()),
         "data_kind": assumption.source.data_kind,
         "formula": (
             "imp=spend/CPM*1000; reach=frequency saturation; clicks=imp*CTR; "

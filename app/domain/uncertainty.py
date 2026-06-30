@@ -56,7 +56,11 @@ def prediction_interval(
     standard_error = point * relative_sd / math.sqrt(scoped_n)
     width = 1.96 * standard_error * staleness_multiplier
     # Industry seeds with n=1 should stay visibly broad, even when a source has no sd.
-    minimum_width = point * max(0.05, (1 - confidence) * 0.12)
+    minimum_width = point * _minimum_relative_width(
+        store=store,
+        source=source,
+        confidence=confidence,
+    )
     width = max(width, minimum_width)
     return EstimateInterval(
         point=point,
@@ -91,6 +95,20 @@ def _relative_sd(*, point: float, sd: float | None, confidence: float) -> float:
             return max(0.03, sd)
         return max(0.03, sd / point)
     return max(0.08, (1 - confidence) * 0.80)
+
+
+def _minimum_relative_width(
+    *,
+    store: BenchmarkStore,
+    source: BenchmarkSource,
+    confidence: float,
+) -> float:
+    base = 0.10 if source.type == "actual" else 0.25
+    latest_year = source.latest_year
+    age = 6 if latest_year is None else max(0, CURRENT_YEAR - latest_year)
+    age_extra = min(0.35, age / max(1.0, store.staleness_halflife_years()) * 0.08)
+    confidence_extra = (1 - confidence) * 0.18
+    return min(0.85, max(0.08, base + age_extra + confidence_extra))
 
 
 def _staleness_interval_multiplier(*, store: BenchmarkStore, source: BenchmarkSource) -> float:

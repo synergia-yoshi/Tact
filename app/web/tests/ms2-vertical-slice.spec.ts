@@ -153,8 +153,9 @@ test("admin-only audit verification is surfaced in the UI", async ({ page }) => 
 
   await fillRequiredBrief(page);
   await page.getByRole("button", { name: /広告案を作成する/ }).click();
+  await expect(page.locator("#creative-title")).toBeVisible();
   await page.getByRole("button", { name: "記録" }).click();
-  await expect(page.getByText("変更できない操作記録")).toBeVisible();
+  await expect(page.locator("#view-audit").getByText("変更できない操作記録")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "記録を検証" })).toBeDisabled();
 

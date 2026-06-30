@@ -101,6 +101,12 @@ def test_allocation_balances_budget_goal_seasonality_and_sources() -> None:
         item.channel: item.budget_jpy for item in awareness.items
     }
     assert all(item.source["benchmark"] for item in conversion.items)
+    assert all(item.source["engine_defaults"] for item in conversion.items)
+    assert any(
+        item.source["seasonality"]["basis"] == "monthly_cvr_avg_relative_to_annual_average"
+        for item in conversion.items
+        if item.source["seasonality"]
+    )
 
 
 def test_uncertainty_interval_narrows_with_sample_size_and_staleness() -> None:
@@ -116,6 +122,39 @@ def test_uncertainty_interval_narrows_with_sample_size_and_staleness() -> None:
 
     assert small.low <= small.point <= small.high
     assert large.high - large.low < small.high - small.low
+
+
+def test_stale_sim_seed_keeps_wide_prediction_interval() -> None:
+    store = load_benchmarks()
+    stale_sim = BenchmarkSource(
+        file="old sim",
+        year=2014,
+        type="sim",
+        data_kind="industry_seed",
+    )
+    interval = prediction_interval(100, store=store, source=stale_sim, n=1, confidence_seed=0.35)
+
+    assert interval.low == 0
+    assert interval.high > 250
+
+
+def test_brand_factor_is_exposed_and_changes_allocation_estimates() -> None:
+    baseline = allocate_media_budget(
+        total_budget_jpy=1_000_000,
+        channels=["search", "social"],
+        objective="conversion",
+        brand_factor=1.0,
+    )
+    stronger_brand = allocate_media_budget(
+        total_budget_jpy=1_000_000,
+        channels=["search", "social"],
+        objective="conversion",
+        brand_factor=1.4,
+    )
+
+    assert stronger_brand.source["brand_factor"] == 1.4
+    assert stronger_brand.estimated_conversions > baseline.estimated_conversions
+    assert stronger_brand.source["objective_score_unit_source"]["data_kind"] == "engine_default"
 
 
 def test_scenarios_sensitivity_feasibility_and_defunct_media_guards() -> None:

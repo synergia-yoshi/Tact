@@ -19,6 +19,13 @@ Base: stacked on `codex/ms6-production-hardening`
   allocation output.
 - Replaced measurement hash/fixed-confidence placeholders in
   `app/adapters/measurement.py` with domain simulation output.
+- Addressed PR #18 review follow-ups:
+  - metric-level source payloads now mark owner-unconfirmed structural defaults
+    as `data_kind=engine_default`;
+  - EC seasonality prefers `monthly_cvr_avg` over budget-ratio proxies;
+  - stale `sim` seeds keep visibly broad prediction intervals;
+  - objective score session/reach unit values live in YAML defaults;
+  - `brand_factor` is exposed through allocation/media/measurement requests.
 - Added `media_plan_model` to measurement/dashboard source types.
 - Updated UI labels and e2e expectations for model estimates.
 - Added `tests/test_domain_engine.py` and updated existing API/dashboard tests.
@@ -35,11 +42,13 @@ Base: stacked on `codex/ms6-production-hardening`
 - Uncertainty produces 95% prediction intervals that narrow with larger `n`.
 - Defunct media (`mediaforge`, `vizury`, `gunosy`) are not allocation candidates.
 - All domain outputs include source payloads and formula/reason metadata.
+- Allocation reasons and placement creative specs expose engine default metrics
+  and seasonality basis for downstream UI/reporting.
 
 ## Validation
 
 - `.\.venv312\Scripts\python.exe -m pytest -q`
-  - 66 passed, 1 existing TestClient warning.
+  - 68 passed, 1 existing TestClient warning.
 - `.\.venv312\Scripts\python.exe -m ruff check .`
   - passed.
 - `npm run test`

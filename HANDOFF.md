@@ -40,6 +40,16 @@ constants with deterministic calculations sourced from `app/domain/benchmarks.ya
   and feasibility warnings.
 - Implemented uncertainty ranges as 95% prediction intervals using source type,
   age, confidence seed, `sd`, and `n`. The old fixed confidence value is gone.
+- Added review follow-up disclosure for owner-unconfirmed structural engine
+  defaults, including metric-level `engine_default` sources, low confidence, and
+  explicit default keys in simulation payloads.
+- Switched EC seasonality to prefer `monthly_cvr_avg` when available, with
+  budget-ratio seasonality retained only as a documented fallback basis.
+- Exposed `brand_factor` through media allocation requests and allocation source
+  payloads.
+- Moved objective score session/reach unit values from code heuristics into
+  `benchmarks.yaml` engine defaults.
+- Widened prediction intervals for stale `sim` seeds with tiny `n`.
 - Replaced `MockMediaAdapter.create_plan` placeholder budget/reach/CPA logic with
   the domain allocation engine.
 - Replaced `MockMeasurementAdapter.fetch_snapshot` hash-derived mock metrics with
@@ -61,6 +71,8 @@ Working:
 - Defunct media from the seed (`mediaforge`, `vizury`, `gunosy`) are filtered out
   of active allocation candidates.
 - Every domain result carries benchmark source payloads and formulas.
+- Every simulation result now separates benchmark metric sources, derived
+  metrics, and owner-unconfirmed engine defaults.
 - Demo build output was regenerated with `VITE_DEMO_MODE=1`.
 
 Still owner/manual:
@@ -72,7 +84,7 @@ Still owner/manual:
 
 ## 4. Validation
 
-- `.\.venv312\Scripts\python.exe -m pytest -q` passed: 66 tests.
+- `.\.venv312\Scripts\python.exe -m pytest -q` passed: 68 tests.
 - `.\.venv312\Scripts\python.exe -m ruff check .` passed.
 - `npm run test` passed: TypeScript typecheck and Vitest.
 - `npm run test:e2e` passed: 5 Playwright tests.

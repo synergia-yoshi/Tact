@@ -20,6 +20,7 @@ class MeasurementReadRequest(BaseModel):
     objective: str = "conversion"
     target_audience: str = ""
     channels: list[str] = Field(default_factory=lambda: ["search", "social", "display"])
+    brand_factor: float = Field(default=1.0, gt=0, le=2.0)
 
 
 class MeasurementAdapter(ABC):
@@ -42,6 +43,7 @@ class MockMeasurementAdapter(MeasurementAdapter):
             target_audience=request.target_audience,
             campaign_name=request.campaign_name,
             month=datetime.now(tz=UTC).month,
+            brand_factor=request.brand_factor,
             store=store,
         )
         sessions = max(1, round(sum(item.simulation.sessions for item in allocation.items)))

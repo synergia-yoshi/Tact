@@ -69,6 +69,7 @@ def allocate_media_budget(
     industry: str | None = None,
     month: int | None = None,
     attribution_model: str = "position_based",
+    brand_factor: float = 1.0,
     store: BenchmarkStore | None = None,
 ) -> AllocationResult:
     store = store or load_benchmarks()
@@ -85,6 +86,7 @@ def allocate_media_budget(
         industry=selected_industry,
         month=month,
         attribution_model=attribution_model,
+        brand_factor=brand_factor,
         store=store,
     )
     sims = {
@@ -94,6 +96,7 @@ def allocate_media_budget(
             objective=objective,
             industry=selected_industry,
             month=month,
+            brand_factor=brand_factor,
             store=store,
         )
         for channel, budget in budgets.items()
@@ -107,6 +110,7 @@ def allocate_media_budget(
             industry=selected_industry,
             month=month,
             attribution_model=attribution_model,
+            brand_factor=brand_factor,
             store=store,
         )
         for channel in active_channels
@@ -165,6 +169,7 @@ def allocate_media_budget(
             objective=objective,
             industry=selected_industry,
             month=month,
+            brand_factor=brand_factor,
             store=store,
         ),
         sensitivity=_sensitivity_summaries(
@@ -173,11 +178,17 @@ def allocate_media_budget(
             industry=selected_industry,
             month=month,
             baseline=totals,
+            brand_factor=brand_factor,
             store=store,
         ),
         source={
             "method": "marginal ROI equalization with saturation, attribution, and seasonality",
             "data_kind": "industry_seed",
+            "brand_factor": brand_factor,
+            "objective_score_unit_values": store.objective_score_unit_values(),
+            "objective_score_unit_source": store.engine_default_source(
+                keys=["objective_score_unit_values"]
+            ),
         },
     )
     return result.__class__(
@@ -226,6 +237,7 @@ def _optimize_budgets(
     industry: str,
     month: int | None,
     attribution_model: str,
+    brand_factor: float,
     store: BenchmarkStore,
 ) -> dict[str, int]:
     if not channels:
@@ -251,6 +263,7 @@ def _optimize_budgets(
                 industry=industry,
                 month=month,
                 attribution_model=attribution_model,
+                brand_factor=brand_factor,
                 store=store,
             ),
         )
@@ -267,6 +280,7 @@ def _optimize_budgets(
                 industry=industry,
                 month=month,
                 attribution_model=attribution_model,
+                brand_factor=brand_factor,
                 store=store,
             ),
         )
@@ -308,6 +322,7 @@ def _marginal_score(
     industry: str,
     month: int | None,
     attribution_model: str,
+    brand_factor: float,
     store: BenchmarkStore,
 ) -> float:
     before = simulate_channel(
@@ -316,6 +331,7 @@ def _marginal_score(
         objective=objective,
         industry=industry,
         month=month,
+        brand_factor=brand_factor,
         store=store,
     )
     after = simulate_channel(
@@ -324,6 +340,7 @@ def _marginal_score(
         objective=objective,
         industry=industry,
         month=month,
+        brand_factor=brand_factor,
         store=store,
     )
     weight = store.attribution_weight(before.channel_class, attribution_model)
@@ -340,11 +357,14 @@ def _objective_score(
 ) -> float:
     profile = store.objective_profile(objective)
     aov = max(1.0, simulation.aov_jpy)
+    unit_values = store.objective_score_unit_values()
+    session_unit = aov * unit_values["sessions_value_ratio"]
+    reach_unit = aov * unit_values["reach_value_ratio"]
     return (
         profile.get("value", 0.0) * simulation.revenue_jpy
         + profile.get("conversions", 0.0) * simulation.conversions * aov
-        + profile.get("sessions", 0.0) * simulation.sessions * (aov / 50)
-        + profile.get("reach", 0.0) * simulation.reach * (aov / 1000)
+        + profile.get("sessions", 0.0) * simulation.sessions * session_unit
+        + profile.get("reach", 0.0) * simulation.reach * reach_unit
     )
 
 
@@ -362,7 +382,16 @@ def _allocation_reasons(
         f"saturation={','.join(simulation.saturation.applied)}",
     ]
     if simulation.source.get("seasonality"):
-        reasons.append("seasonality factor applied")
+        seasonality = simulation.source["seasonality"]
+        factor = seasonality.get("factor") if isinstance(seasonality, dict) else None
+        reasons.append(
+            f"seasonality factor considered ({factor:.2f}x)"
+            if isinstance(factor, int | float)
+            else "seasonality layer considered"
+        )
+    if simulation.source.get("engine_defaults"):
+        defaults = ",".join(str(key) for key in simulation.source["engine_defaults"])
+        reasons.append(f"owner-unconfirmed engine defaults used: {defaults}")
     return reasons
 
 
@@ -420,6 +449,7 @@ def _scenario_summaries(
     objective: str,
     industry: str,
     month: int | None,
+    brand_factor: float,
     store: BenchmarkStore,
 ) -> list[ScenarioSummary]:
     summaries: list[ScenarioSummary] = []
@@ -432,6 +462,7 @@ def _scenario_summaries(
                 industry=industry,
                 month=month,
                 scenario=name,
+                brand_factor=brand_factor,
                 store=store,
             )
             for channel, budget in budgets.items()
@@ -459,6 +490,7 @@ def _sensitivity_summaries(
     industry: str,
     month: int | None,
     baseline: dict[str, float],
+    brand_factor: float,
     store: BenchmarkStore,
 ) -> list[SensitivitySummary]:
     levers = [
@@ -475,6 +507,7 @@ def _sensitivity_summaries(
             industry=industry,
             month=month,
             store=store,
+            brand_factor=brand_factor,
             **params,
         )
         conversions_delta = totals["conversions"] - baseline["conversions"]
@@ -498,6 +531,7 @@ def _simulate_with_sensitivity(
     industry: str,
     month: int | None,
     store: BenchmarkStore,
+    brand_factor: float,
     budget_multiplier: float = 1.0,
     cvr_multiplier: float = 1.0,
     aov_multiplier: float = 1.0,
@@ -517,6 +551,7 @@ def _simulate_with_sensitivity(
                 "aov": assumption.metrics["aov"] * aov_multiplier,
                 "cpm": assumption.metrics["cpm"] * cpm_multiplier,
             },
+            brand_factor=brand_factor,
             store=store,
         )
         items.append(
