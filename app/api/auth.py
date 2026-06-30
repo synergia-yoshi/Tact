@@ -67,6 +67,8 @@ async def create_dev_token(
         org_id=request.org_id,
         roles=[request.role],
         expires_at=expires_at,
+        issuer=settings.auth_issuer,
+        audience=settings.auth_audience,
     )
     return DevTokenResponse(
         token=token,

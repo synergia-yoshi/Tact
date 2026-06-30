@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
@@ -106,17 +107,90 @@ class MediaAdapter(ABC):
         """Fetch delivery status for kill-switch evaluation."""
 
 
+@dataclass(frozen=True)
+class ObjectiveStrategy:
+    channel_weights: dict[str, int]
+    optimization_metric: str
+    bid_strategy: str
+    reach_multiplier: float
+    cpa_divisor: int
+
+
+_DEFAULT_OBJECTIVE_STRATEGY = ObjectiveStrategy(
+    channel_weights={"search": 40, "social": 35, "display": 25},
+    optimization_metric="conversions",
+    bid_strategy="maximize_conversions",
+    reach_multiplier=3.0,
+    cpa_divisor=120,
+)
+
+_OBJECTIVE_STRATEGIES = {
+    "conversion": ObjectiveStrategy(
+        channel_weights={"search": 45, "social": 35, "display": 20},
+        optimization_metric="conversion_value",
+        bid_strategy="target_roas",
+        reach_multiplier=2.7,
+        cpa_divisor=105,
+    ),
+    "lead_generation": ObjectiveStrategy(
+        channel_weights={"search": 50, "social": 35, "display": 15},
+        optimization_metric="qualified_leads",
+        bid_strategy="target_cpa",
+        reach_multiplier=2.8,
+        cpa_divisor=130,
+    ),
+    "traffic": ObjectiveStrategy(
+        channel_weights={"search": 40, "display": 35, "social": 25},
+        optimization_metric="clicks",
+        bid_strategy="maximize_clicks",
+        reach_multiplier=4.2,
+        cpa_divisor=170,
+    ),
+    "awareness": ObjectiveStrategy(
+        channel_weights={"display": 50, "social": 35, "search": 15},
+        optimization_metric="reach",
+        bid_strategy="target_cpm",
+        reach_multiplier=5.4,
+        cpa_divisor=220,
+    ),
+    "local_visits": ObjectiveStrategy(
+        channel_weights={"search": 55, "display": 30, "social": 15},
+        optimization_metric="store_visits",
+        bid_strategy="maximize_conversions",
+        reach_multiplier=3.1,
+        cpa_divisor=115,
+    ),
+    "app_promotion": ObjectiveStrategy(
+        channel_weights={"social": 50, "display": 30, "search": 20},
+        optimization_metric="installs",
+        bid_strategy="target_cpa",
+        reach_multiplier=3.8,
+        cpa_divisor=145,
+    ),
+    "efficiency": ObjectiveStrategy(
+        channel_weights={"search": 45, "social": 30, "display": 25},
+        optimization_metric="cpa_jpy",
+        bid_strategy="target_cpa",
+        reach_multiplier=2.6,
+        cpa_divisor=150,
+    ),
+}
+
+
 class MockMediaAdapter(MediaAdapter):
     """Deterministic media API adapter for MVP development."""
 
     async def create_plan(self, request: MediaPlanRequest) -> MediaPlanResponse:
         channels = request.channels or ["search", "social"]
-        base_budget = request.total_budget_jpy // len(channels)
-        remainder = request.total_budget_jpy % len(channels)
+        strategy = _objective_strategy(request.objective)
+        budgets = _allocate_budget(
+            request.total_budget_jpy,
+            channels,
+            strategy.channel_weights,
+        )
 
         placements: list[MediaPlacement] = []
-        for index, channel in enumerate(channels):
-            budget = base_budget + (remainder if index == 0 else 0)
+        for channel, budget in zip(channels, budgets, strict=True):
             placements.append(
                 MediaPlacement(
                     channel=channel,
@@ -124,18 +198,25 @@ class MockMediaAdapter(MediaAdapter):
                     objective=request.objective,
                     targeting={
                         "audience": request.target_audience,
-                        "keywords": [request.objective, channel, "mvp"],
+                        "keywords": [
+                            request.campaign_name,
+                            request.objective,
+                            strategy.optimization_metric,
+                            channel,
+                        ],
                     },
                     creative_spec={
                         "format": "responsive",
                         "primary_text_max_chars": "120",
                         "asset_policy": "mock-validation-only",
+                        "optimization_metric": strategy.optimization_metric,
+                        "bid_strategy": strategy.bid_strategy,
                     },
                 )
             )
 
-        estimated_reach = max(1000, request.total_budget_jpy * 3)
-        estimated_cpa = max(100, request.total_budget_jpy // 120)
+        estimated_reach = max(1000, round(request.total_budget_jpy * strategy.reach_multiplier))
+        estimated_cpa = max(100, round(request.total_budget_jpy / strategy.cpa_divisor))
         channel_uncertainty = min(0.28, 0.16 + (0.02 * max(0, len(channels) - 1)))
 
         return MediaPlanResponse(
@@ -205,3 +286,33 @@ def _estimate_range(value: float, *, uncertainty: float, confidence: float) -> E
         confidence=confidence,
         source="mock",
     )
+
+
+def _objective_strategy(objective: str) -> ObjectiveStrategy:
+    return _OBJECTIVE_STRATEGIES.get(objective, _DEFAULT_OBJECTIVE_STRATEGY)
+
+
+def _allocate_budget(
+    total_budget_jpy: int,
+    channels: list[str],
+    weights: dict[str, int],
+) -> list[int]:
+    if not channels:
+        return []
+    channel_weights = [max(0, weights.get(channel, 1)) for channel in channels]
+    if sum(channel_weights) == 0:
+        channel_weights = [1 for _ in channels]
+    total_weight = sum(channel_weights)
+    raw_allocations = [
+        (total_budget_jpy * weight) / total_weight for weight in channel_weights
+    ]
+    budgets = [int(allocation) for allocation in raw_allocations]
+    remainder = total_budget_jpy - sum(budgets)
+    fractional_order = sorted(
+        range(len(raw_allocations)),
+        key=lambda index: raw_allocations[index] - budgets[index],
+        reverse=True,
+    )
+    for index in fractional_order[:remainder]:
+        budgets[index] += 1
+    return budgets

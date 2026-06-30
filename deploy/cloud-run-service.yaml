@@ -1,0 +1,42 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: tact-api
+  annotations:
+    run.googleapis.com/ingress: internal-and-cloud-load-balancing
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: tact-api-runtime@PROJECT_ID.iam.gserviceaccount.com
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/tact/tact-api:COMMIT_SHA
+          env:
+            - name: APP_ENV
+              value: production
+            - name: AUTH_MODE
+              value: oidc
+            - name: IAP_REQUIRED
+              value: "true"
+            - name: OIDC_ISSUER
+              value: "https://issuer.example"
+            - name: OIDC_AUDIENCE
+              value: "tact-api"
+            - name: OIDC_JWKS_URL
+              value: "https://issuer.example/.well-known/jwks.json"
+            - name: IAP_ISSUER
+              value: "https://cloud.google.com/iap"
+            - name: IAP_AUDIENCE
+              value: "/projects/PROJECT_NUMBER/global/backendServices/BACKEND_SERVICE_ID"
+            - name: IAP_JWKS_URL
+              value: "https://www.gstatic.com/iap/verify/public_key-jwk"
+            - name: STORAGE_BACKEND
+              value: firestore
+            - name: GCP_PROJECT_ID
+              value: PROJECT_ID
+            - name: MEDIA_API_KEY
+              value: "sm://projects/PROJECT_ID/secrets/tact-media-api-key/versions/latest"
+            - name: LLM_API_KEY
+              value: "sm://projects/PROJECT_ID/secrets/tact-llm-api-key/versions/latest"

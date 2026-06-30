@@ -4,101 +4,73 @@
 
 Repo: `synergia-yoshi/Tact`
 Local path: `C:\dev\repos\Tact`
-Branch: `codex/responsive-netlify-demo`
-Base: `origin/codex/ms5-role-separation` / PR #15
-Draft PR: `https://github.com/synergia-yoshi/Tact/pull/16`
+Branch: `codex/ms6-production-hardening`
+Base: `origin/codex/responsive-netlify-demo` / PR #16
+Draft PR: `https://github.com/synergia-yoshi/Tact/pull/17`
 
-This branch implements the responsive + Netlify static demo brief from
-`2026-06-30-Codex-responsive-and-netlify.md`. It is stacked on MS5 role
-separation and keeps the normal FastAPI-backed build intact.
+This branch starts MS6 production hardening from
+`2026-06-30-Codex-MS6-production-hardening.md`. It is intentionally a footing
+pass: GCP provisioning is still owner work, while app code, config guards,
+tests, and deployment handoff docs are added here.
 
 ## 2. What Changed
 
-- Added `VITE_DEMO_MODE` switching in `app/web/src/api.ts`.
-  - Normal build: frontend continues to call relative `/api/v1/...`.
-  - Demo build: frontend uses an in-browser mock API and does not require the
-    FastAPI backend.
-- Added `app/web/src/demoApi.ts`, which supports:
-  proposal creation, dashboard metrics, legal gate, approval, Kill Switch
-  evaluate/stop simulation, integration catalog UI, audit verification, and
-  role assignment updates.
-- Added `app/web/src/demoApi.test.ts` to verify the browser mock keeps all
-  returned dashboard data simulated and customer reads redacted.
-- Added a fixed demo banner:
-  `デモ環境 ― 実データではありません（テスト用）`.
-- Added demo-mode copy guards so source labels and settings text stay test-only
-  in demo mode.
-- Added `netlify.toml`:
-  - build command: `npm run build:demo`
-  - publish directory: `app/web/dist`
-  - env: `VITE_DEMO_MODE=1`
-  - SPA redirect: `/* /index.html 200`
-- Strengthened responsive CSS:
-  - no document-level horizontal scroll on target widths
-  - mobile nav folds into an icon rail with internal scrolling
-  - primary tap targets are at least 44px
-  - dashboard/settings/cards stack cleanly on narrow widths
-- Added Playwright coverage for 360, 390, 768, 1024, 1280, and 1440 widths.
-- Rebuilt committed Vite assets in `app/web/dist` with the normal non-demo
-  build.
+- Added `AUTH_MODE=oidc` configuration.
+- Added a dependency-free RS256/JWKS JWT verifier in `app/oidc.py`.
+  It validates `iss`, `aud`, `exp`, `iat`, `nbf`, maximum token age, key
+  selection by `kid`, and signature integrity.
+- Hardened signed bearer tokens with `iat`, `nbf`, `jti`, `iss`, and `aud`.
+- Added optional signed-token replay rejection via `AUTH_REPLAY_PROTECTION`.
+- Production is now fail-closed:
+  `APP_ENV=production` requires `AUTH_MODE=oidc` plus complete OIDC and IAP
+  settings.
+- Added IAP assertion verification hook before bearer/OIDC auth.
+- Added production security headers: CSP, HSTS, Referrer-Policy,
+  X-Content-Type-Options, and X-Frame-Options.
+- Added audit payload masking for secret-like keys and email addresses.
+- Changed Firestore audit append footing to create-if-absent instead of
+  blind `set`, so existing audit entry IDs are not overwritten.
+- Normalized legal findings with `category`, `severity`
+  (`info`/`warning`/`blocking`), `normalized_term`, and `rationale`.
+- Added `deploy/cloud-run-service.yaml` skeleton for Cloud Run behind IAP.
+- Added handoff instructions for IAP/Cloud Run and Google Drive plaintext-key
+  migration.
 
 ## 3. Current State
 
 Working:
 
-- Normal local/FastAPI mode still uses the backend through relative `/api/v1`
-  URLs.
-- Netlify/static demo mode can run without backend services.
-- Demo mode supports the primary flow:
-  create proposal -> dashboard -> approval -> Kill stop simulation ->
-  integration catalog -> audit -> role switch.
-- Viewer/approver/operator/admin role behavior from MS5 is preserved in demo
-  mode.
-- Demo API returns simulated/test-use data and redacts customer-role campaign
-  reads.
-- Demo banner is always visible when `VITE_DEMO_MODE` is enabled.
+- Local/dev compatibility is preserved: `disabled` and `signed_bearer` still
+  work outside production.
+- Production settings reject `disabled` and `signed_bearer`.
+- OIDC verifier attack tests cover expired, future `nbf`, tampering, wrong
+  issuer, and wrong audience.
+- Signed bearer tests cover future `nbf`, wrong issuer/audience, and duplicate
+  `jti` replay rejection.
+- Legal blocking/warning results are structured and existing publish flow still
+  requires `passed` before approval request.
+- Audit payloads redact obvious secrets and emails before persistence.
 
-Still simulated/mock:
+Still owner/manual:
 
-- Demo data is in-memory browser state and resets on reload.
-- Netlify demo does not connect OAuth, media APIs, GA4, Shopify, or real auth.
-- Kill stop remains a simulation and does not perform any real delivery action.
+- Creating the IdP tenant, Cloud Run service, IAP backend, IAM bindings, and
+  Secret Manager resources.
+- Rotating and removing any plaintext API keys from Google Drive.
+- Wiring production structured logs to the target logging backend.
 
-## 4. Netlify Setup
+## 4. Validation
 
-Use the checked-in `netlify.toml`.
-
-- Build command: `npm run build:demo`
-- Publish directory: `app/web/dist`
-- Environment variable: `VITE_DEMO_MODE=1`
-- SPA redirect is already configured:
-  `from = "/*"`, `to = "/index.html"`, `status = 200`
-
-Local demo build on PowerShell:
-
-```powershell
-$env:VITE_DEMO_MODE='1'; npm run build:demo; Remove-Item Env:VITE_DEMO_MODE
-```
-
-Local normal build:
-
-```powershell
-npm run build
-```
-
-## 5. Validation
-
+- `.\.venv312\Scripts\python.exe -m pytest` passed: 59 tests.
+- `.\.venv312\Scripts\python.exe -m ruff check .` passed.
 - `npm run test` passed:
   TypeScript typecheck and Vitest.
 - `npm run test:e2e` passed: 5 Playwright tests.
-  Coverage includes the existing role/dashboard flows plus responsive checks for
-  360, 390, 768, 1024, 1280, and 1440 widths.
-- `VITE_DEMO_MODE=1 npm run build:demo` equivalent passed via PowerShell env.
-- `.\.venv312\Scripts\python.exe -m pytest` passed: 43 tests.
-- `.\.venv312\Scripts\python.exe -m ruff check .` passed.
 - `git diff --check` passed.
 
-## 6. Assumptions Made
+Known warning: FastAPI/Starlette TestClient emits the existing `httpx2`
+deprecation warning only.
+
+## 5. Assumptions Made
 
 - PR split remains:
   - #12: MS2 Vite vertical slice
@@ -106,13 +78,19 @@ npm run build
   - #14: MS4 rich dashboard
   - #15: MS5 role separation
   - #16: responsive + Netlify static demo
-- `build:demo` intentionally relies on Netlify or the caller setting
-  `VITE_DEMO_MODE=1`; the script itself remains cross-platform.
-- `app/web/dist` remains committed because FastAPI serves built assets directly.
+  - #17: MS6 production hardening footing
+- Firestore transaction hardening is started with create-if-absent behavior;
+  the production SDK transaction decorator should be wired after a real
+  Firestore integration pass.
+- Signed bearer replay protection is optional so current local/dev multi-request
+  UI sessions keep working.
 
-## 7. Next Work
+## 6. Next Work
 
-1. Deploy the Netlify demo from this branch after PR review.
-2. Add persistent demo seeding only if stakeholders need reload-stable state.
-3. Keep production auth, OAuth, real media APIs, and real measurement adapters
-   on the backend hardening track.
+1. Wire real Firestore transaction retries around audit append using the Google
+   Cloud client transaction API.
+2. Decide staging behavior for `AUTH_REPLAY_PROTECTION`.
+3. Add production structured logging sinks for auth failure, 403, Kill,
+   approval, role change, and legal blocking events.
+4. Provision IdP/IAP/Cloud Run/Secret Manager using
+   `deploy/cloud-run-service.yaml` as the skeleton.

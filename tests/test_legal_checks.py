@@ -22,9 +22,10 @@ def test_legal_check_blocks_medical_cure_claims() -> None:
     )
 
     assert result.status == "blocked"
-    assert {finding.rule_id for finding in result.findings} == {
-        "yakkihou_medical_cure_claim"
-    }
+    assert {finding.rule_id for finding in result.findings} == {"yakkihou_medical_cure_claim"}
+    assert {finding.severity for finding in result.findings} == {"blocking"}
+    assert {finding.category for finding in result.findings} == {"medical_claim"}
+    assert {finding.normalized_term for finding in result.findings} >= {"治る", "完治"}
 
 
 def test_legal_check_flags_absolute_claims_for_review() -> None:
@@ -36,4 +37,8 @@ def test_legal_check_flags_absolute_claims_for_review() -> None:
     )
 
     assert result.status == "needs_review"
-    assert {finding.severity for finding in result.findings} == {"review"}
+    assert {finding.severity for finding in result.findings} == {"warning"}
+    assert {finding.category for finding in result.findings} == {
+        "absolute_claim",
+        "superlative_claim",
+    }

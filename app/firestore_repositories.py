@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import CampaignProposal
 from app.repositories import AuditRepository, CampaignRepository
+from app.security import mask_sensitive_data
 
 
 class FirestoreCampaignRepository(CampaignRepository):
@@ -34,6 +35,7 @@ class FirestoreCampaignRepository(CampaignRepository):
 
 class FirestoreAuditRepository(AuditRepository):
     def __init__(self, *, client: object, collection_prefix: str) -> None:
+        self._client = client
         self._collection = client.collection(f"{collection_prefix}_audit_entries")
 
     def append(
@@ -57,12 +59,12 @@ class FirestoreAuditRepository(AuditRepository):
             subject_type=subject_type,
             subject_id=subject_id,
             summary=summary,
-            payload=payload,
-            diff=diff,
-            guardrail_result=guardrail_result,
+            payload=mask_sensitive_data(payload or {}),
+            diff=mask_sensitive_data(diff or {}),
+            guardrail_result=mask_sensitive_data(guardrail_result or {}),
             prev_hash=previous.hash if previous else None,
         )
-        self._collection.document(entry.id).set(entry.model_dump(mode="json"))
+        self._create_entry(entry)
         return entry
 
     def list(self) -> list[AuditEntry]:
@@ -106,6 +108,16 @@ class FirestoreAuditRepository(AuditRepository):
     def _last_entry(self) -> AuditEntry | None:
         entries = self._ordered_entries()
         return entries[-1] if entries else None
+
+    def _create_entry(self, entry: AuditEntry) -> None:
+        document = self._collection.document(entry.id)
+        if hasattr(document, "create"):
+            document.create(entry.model_dump(mode="json"))
+            return
+        snapshot = document.get()
+        if getattr(snapshot, "exists", False):
+            raise RuntimeError("Audit entry already exists; refusing to overwrite")
+        document.set(entry.model_dump(mode="json"))
 
     def _ordered_entries(self) -> list[AuditEntry]:
         entries = [

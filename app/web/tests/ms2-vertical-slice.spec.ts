@@ -1,4 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function fillRequiredBrief(
+  page: Page,
+  product = "法人向け勤怠管理ツール",
+): Promise<void> {
+  await page.locator("#product-input").fill(product);
+}
 
 test("operator creates a proposal, gates publish, and approver submits to dashboard", async ({
   page,
@@ -9,7 +16,13 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   await expect(page.getByRole("button", { name: "成果" })).toBeVisible();
   await expect(page.getByText("安全な確認モード")).toBeVisible();
   await expect(page.locator("#generation-stepper-content").getByText("宣伝内容の入力")).toBeVisible();
-  await expect(page.getByText("費用対効果を最大化")).toBeVisible();
+  await expect(page.locator("#product-input")).toHaveAttribute("placeholder", /例：/);
+  await expect(page.locator(".objective-card")).toHaveCount(6);
+  await expect(page.getByText("売上・購入")).toBeVisible();
+  await expect(page.getByText("見込み顧客")).toBeVisible();
+  await expect(page.getByText("認知拡大")).toBeVisible();
+  await expect(page.getByText("選んだ目標で、優先する媒体配分と確認する指標を変えます。")).toBeVisible();
+  await expect(page.getByText("費用対効果を最大化")).toHaveCount(0);
   await expect(page.getByText("費用を抑える")).toHaveCount(0);
   await expect(page.locator(".choice-card")).toHaveCount(2);
   await expect(page.getByText("おまかせ")).toBeVisible();
@@ -17,6 +30,8 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   await expect(page.getByText("全部まかせる")).toHaveCount(0);
   await expect(page.getByText("どちらを選んでも、広告を出す前・予算変更は必ず人が確認します。")).toBeVisible();
 
+  await fillRequiredBrief(page);
+  await page.getByRole("button", { name: /認知拡大/ }).click();
   await page.locator("#budget-range").evaluate((element) => {
     const input = element as HTMLInputElement;
     input.value = "500";
@@ -31,12 +46,24 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   );
   await page.getByRole("button", { name: /広告案を作成する/ }).click();
   const proposal = await proposalResponsePromise.then((response) => response.json());
+  expect(proposal.brief.name).toBe("法人向け勤怠管理ツール");
+  expect(proposal.brief.objective).toBe("awareness");
+  expect(proposal.brief.kpis).toContain("reach");
   expect(proposal.brief.total_budget_jpy).toBe(5_000_000);
   const allocatedBudget = proposal.media_plan.placements.reduce(
     (total: number, placement: { budget_jpy: number }) => total + placement.budget_jpy,
     0,
   );
   expect(allocatedBudget).toBe(5_000_000);
+  const placementByChannel = Object.fromEntries(
+    proposal.media_plan.placements.map(
+      (placement: { channel: string; budget_jpy: number }) => [
+        placement.channel,
+        placement.budget_jpy,
+      ],
+    ),
+  );
+  expect(placementByChannel.display).toBeGreaterThan(placementByChannel.search);
   await expect(page.locator("#creative-title")).toBeVisible();
   const creativeView = page.locator("#view-creative");
   await expect(creativeView.getByText("テスト用の案 / 広告文")).toBeVisible();
@@ -46,6 +73,8 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
   await expect(creativeView.getByText("実際に終わった作業だけ表示")).toBeVisible();
   await expect(creativeView.getByText("見せかけなし")).toBeVisible();
   await expect(creativeView.getByText("テスト用の数字").first()).toBeVisible();
+  await expect(creativeView.getByText("認知拡大")).toBeVisible();
+  await expect(creativeView.getByText("表示回数・リーチ・CPM を見て、媒体配分を組みます。")).toBeVisible();
   await expect(creativeView.locator(".generation-step.complete")).toHaveCount(3);
   const reachConfidence = Math.round(
     proposal.media_plan.estimated_reach_range.confidence * 100,
@@ -120,6 +149,7 @@ test("operator creates a proposal, gates publish, and approver submits to dashbo
 test("admin-only audit verification is surfaced in the UI", async ({ page }) => {
   await page.goto("/");
 
+  await fillRequiredBrief(page);
   await page.getByRole("button", { name: /広告案を作成する/ }).click();
   await page.getByRole("button", { name: "記録" }).click();
   await expect(page.getByText("変更できない操作記録")).toBeVisible();
@@ -143,6 +173,7 @@ test("create proposal disables the submit button while the request is in flight"
 
   await page.goto("/");
   await expect(page.getByText("安全な確認モード")).toBeVisible();
+  await fillRequiredBrief(page);
 
   const createButton = page.getByRole("button", { name: /広告案を作成する/ });
   await createButton.click();
@@ -201,6 +232,7 @@ test("settings shows honest data integration status and admin-only connection pa
 
 test("primary surfaces stay responsive across target widths", async ({ page }) => {
   await page.goto("/");
+  await fillRequiredBrief(page);
   await page.locator("#create-button").click();
   await expect(page.locator("#creative-title")).toBeVisible();
   await page.locator('[data-role="admin"]').click();
