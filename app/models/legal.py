@@ -7,13 +7,17 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 LegalCheckStatus = Literal["passed", "needs_review", "blocked"]
+LegalSeverity = Literal["info", "warning", "blocking"]
 
 
 class LegalFinding(BaseModel):
     rule_id: str
-    severity: Literal["review", "block"]
+    category: str
+    severity: LegalSeverity
     matched_text: str
+    normalized_term: str
     message: str
+    rationale: str
 
 
 class LegalCheckResult(BaseModel):

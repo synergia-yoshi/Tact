@@ -10,6 +10,7 @@ from app.api.health import router as health_router
 from app.api.roles import router as roles_router
 from app.config import get_settings
 from app.policy import PolicyViolationError
+from app.security import SECURITY_HEADERS
 
 WEB_DIR = Path(__file__).parent / "web"
 WEB_DIST_DIR = WEB_DIR / "dist"
@@ -19,6 +20,14 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0")
     app.mount("/static", StaticFiles(directory=WEB_DIST_DIR / "static"), name="static")
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        if settings.app_env.lower() in {"prod", "production"}:
+            for name, value in SECURITY_HEADERS.items():
+                response.headers.setdefault(name, value)
+        return response
 
     @app.exception_handler(PolicyViolationError)
     async def policy_violation_handler(

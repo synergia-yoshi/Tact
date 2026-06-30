@@ -160,21 +160,37 @@ Local development defaults to:
 AUTH_MODE=disabled
 ```
 
-In that mode the API uses a fixed `dev-org` / `dev-user` context. Server
-deployments should require signed bearer auth:
+In that mode the API uses a fixed `dev-org` / `dev-user` context. Local and
+development deployments can use signed bearer auth:
 
 ```txt
 AUTH_MODE=signed_bearer
 AUTH_TOKEN_SECRET=sm://projects/<project-id>/secrets/tact-auth-token-secret/versions/latest
 ```
 
-Signed bearer tokens carry verified `sub`, `org_id`, and `roles` claims. The
-service derives tenant scope from the verified token, requires an `exp` claim,
-and ignores spoofable tenant headers such as `x-tact-org`.
+Signed bearer tokens carry verified `sub`, `org_id`, `roles`, `exp`, `iat`,
+`nbf`, `jti`, `iss`, and `aud` claims. The service derives tenant scope from
+the verified token, applies maximum token lifetime and clock-skew checks, can
+enable replay rejection through `AUTH_REPLAY_PROTECTION=true`, and ignores
+spoofable tenant headers such as `x-tact-org`.
 
-`APP_ENV=production` or `APP_ENV=prod` refuses to start with
-`AUTH_MODE=disabled`. Local disabled auth maps to an admin-only development
-context so the MVP remains easy to exercise without production risk.
+Production is fail-closed. `APP_ENV=production` or `APP_ENV=prod` requires:
+
+```txt
+AUTH_MODE=oidc
+OIDC_ISSUER=https://<issuer>
+OIDC_AUDIENCE=<audience>
+OIDC_JWKS_URL=https://<issuer>/.well-known/jwks.json
+IAP_REQUIRED=true
+IAP_ISSUER=https://cloud.google.com/iap
+IAP_AUDIENCE=/projects/<number>/global/backendServices/<id>
+IAP_JWKS_URL=https://www.gstatic.com/iap/verify/public_key-jwk
+```
+
+OIDC and IAP assertions are RS256 JWTs verified against JWKS with issuer,
+audience, `exp`, `iat`, and `nbf` checks. Local disabled auth maps to an
+admin-only development context so the MVP remains easy to exercise without
+production risk.
 
 Local UI review can request short-lived signed tokens through
 `POST /api/v1/auth/dev-token`. This endpoint is intentionally local-only and
@@ -214,8 +230,13 @@ Role-gated operations use the shared policy matrix in `app/policy.py`:
 - [x] Publish approval requests require a passed rule-based legal check first.
 - [x] Kill Switch evaluation is audited and explicitly marks mock media status
   as simulated.
-- [x] Production cannot boot with `AUTH_MODE=disabled`.
-- [x] Signed bearer tokens require `exp` and expired tokens are rejected.
+- [x] Production cannot boot unless `AUTH_MODE=oidc` and IAP settings are
+  present.
+- [x] Signed bearer tokens require `exp`, `iat`, `nbf`, `jti`, `iss`, and
+  `aud`; expired, future, wrong issuer/audience, and replayed tokens are
+  rejected by tests.
+- [x] OIDC RS256/JWKS verification rejects expired, future, tampered,
+  wrong-issuer, and wrong-audience JWTs by tests.
 - [x] Publish approval and audit verification are role-gated by policy matrix.
 - [x] UI is served from `/` with seven button-based navigation screens.
 - [x] Dashboard is a first-class view with Chart.js-backed campaign metrics.

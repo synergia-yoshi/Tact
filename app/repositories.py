@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 from app.models.audit import AuditEntry, AuditVerificationResult
 from app.models.campaign import CampaignProposal
+from app.security import mask_sensitive_data
 
 
 class CampaignRepository(ABC):
@@ -104,9 +105,9 @@ class InMemoryAuditRepository(AuditRepository):
             subject_type=subject_type,
             subject_id=subject_id,
             summary=summary,
-            payload=payload,
-            diff=diff,
-            guardrail_result=guardrail_result,
+            payload=mask_sensitive_data(payload or {}),
+            diff=mask_sensitive_data(diff or {}),
+            guardrail_result=mask_sensitive_data(guardrail_result or {}),
             prev_hash=prev_hash,
         )
         self._entries.append(entry)

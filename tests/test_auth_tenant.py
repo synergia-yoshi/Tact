@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from app.auth import create_signed_auth_token
+from app.auth import ReplayCache, create_signed_auth_token, verify_signed_auth_token
 from app.config import get_settings
 from app.dependencies import (
     get_llm_adapter,
@@ -319,9 +319,7 @@ def test_local_dev_token_can_be_used_for_signed_bearer_auth(
 
 
 def test_dev_token_minting_is_rejected_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("AUTH_MODE", "signed_bearer")
-    monkeypatch.setenv("AUTH_TOKEN_SECRET", AUTH_SECRET)
+    _set_complete_production_auth_env(monkeypatch)
     _clear_dependency_caches()
     client = TestClient(create_app())
 
@@ -329,6 +327,77 @@ def test_dev_token_minting_is_rejected_in_production(monkeypatch: pytest.MonkeyP
 
     assert response.status_code == 403
     _clear_dependency_caches()
+
+
+def test_production_iap_header_is_required_before_api_auth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_complete_production_auth_env(monkeypatch)
+    _clear_dependency_caches()
+    client = TestClient(create_app())
+
+    response = client.get("/api/v1/campaigns")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "IAP assertion required"
+    _clear_dependency_caches()
+
+
+def test_production_security_headers_are_added(monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_complete_production_auth_env(monkeypatch)
+    _clear_dependency_caches()
+    client = TestClient(create_app())
+
+    response = client.get("/health")
+
+    assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+    _clear_dependency_caches()
+
+
+def test_signed_bearer_rejects_future_nbf_wrong_issuer_and_audience() -> None:
+    future_token = create_signed_auth_token(
+        secret=AUTH_SECRET,
+        actor_id="future-user",
+        org_id="org-a",
+        not_before=datetime.now(UTC) + timedelta(minutes=10),
+    )
+    with pytest.raises(ValueError, match="not valid yet"):
+        verify_signed_auth_token(token=future_token, secret=AUTH_SECRET)
+
+    wrong_issuer = create_signed_auth_token(
+        secret=AUTH_SECRET,
+        actor_id="issuer-user",
+        org_id="org-a",
+        issuer="https://wrong.example",
+    )
+    with pytest.raises(ValueError, match="issuer"):
+        verify_signed_auth_token(token=wrong_issuer, secret=AUTH_SECRET)
+
+    wrong_audience = create_signed_auth_token(
+        secret=AUTH_SECRET,
+        actor_id="audience-user",
+        org_id="org-a",
+        audience="wrong-api",
+    )
+    with pytest.raises(ValueError, match="audience"):
+        verify_signed_auth_token(token=wrong_audience, secret=AUTH_SECRET)
+
+
+def test_signed_bearer_replay_cache_rejects_duplicate_jti() -> None:
+    token = create_signed_auth_token(
+        secret=AUTH_SECRET,
+        actor_id="replay-user",
+        org_id="org-a",
+        token_id="fixed-jti",
+    )
+    replay_cache = ReplayCache()
+
+    verify_signed_auth_token(token=token, secret=AUTH_SECRET, replay_cache=replay_cache)
+    with pytest.raises(ValueError, match="already been used"):
+        verify_signed_auth_token(token=token, secret=AUTH_SECRET, replay_cache=replay_cache)
 
 
 def _headers(
@@ -360,6 +429,18 @@ def _signed_token_without_exp(*, actor_id: str, org_id: str) -> str:
     ).digest()
     signature = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
     return f"{payload_b64}.{signature}"
+
+
+def _set_complete_production_auth_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_MODE", "oidc")
+    monkeypatch.setenv("OIDC_ISSUER", "https://issuer.example")
+    monkeypatch.setenv("OIDC_AUDIENCE", "tact-api")
+    monkeypatch.setenv("OIDC_JWKS_URL", "https://issuer.example/.well-known/jwks.json")
+    monkeypatch.setenv("IAP_REQUIRED", "true")
+    monkeypatch.setenv("IAP_ISSUER", "https://cloud.google.com/iap")
+    monkeypatch.setenv("IAP_AUDIENCE", "/projects/123/global/backendServices/456")
+    monkeypatch.setenv("IAP_JWKS_URL", "https://www.gstatic.com/iap/verify/public_key-jwk")
 
 
 def _create_ready_to_publish_campaign(client: TestClient, headers: dict[str, str]) -> dict:

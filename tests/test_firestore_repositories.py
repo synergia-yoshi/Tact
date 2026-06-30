@@ -25,6 +25,11 @@ class FakeDocumentReference:
     def set(self, data: dict) -> None:
         self._store[self._document_id] = deepcopy(data)
 
+    def create(self, data: dict) -> None:
+        if self._document_id in self._store:
+            raise RuntimeError("document already exists")
+        self._store[self._document_id] = deepcopy(data)
+
     def get(self) -> FakeDocumentSnapshot:
         return FakeDocumentSnapshot(self._store.get(self._document_id))
 
@@ -111,3 +116,45 @@ def test_firestore_audit_repository_appends_and_verifies_chain() -> None:
         first.id,
         second.id,
     ]
+
+
+def test_firestore_audit_repository_masks_sensitive_payloads() -> None:
+    client = FakeFirestoreClient()
+    repository = FirestoreAuditRepository(client=client, collection_prefix="tact_test")
+
+    entry = repository.append(
+        event_type="campaign.secret.checked",
+        actor="system",
+        subject_type="campaign",
+        subject_id="cmp_1",
+        summary="Checked.",
+        payload={
+            "api_key": "plain-key",
+            "contact_email": "owner@example.com",
+            "nested": {"auth-token": "bearer-token"},
+        },
+    )
+
+    assert entry.payload["api_key"] == "***redacted***"
+    assert entry.payload["contact_email"] == "o***@example.com"
+    assert entry.payload["nested"]["auth-token"] == "***redacted***"
+
+
+def test_firestore_audit_repository_refuses_existing_entry_overwrite() -> None:
+    client = FakeFirestoreClient()
+    repository = FirestoreAuditRepository(client=client, collection_prefix="tact_test")
+    entry = repository.append(
+        event_type="campaign.proposal.created",
+        actor="system",
+        subject_type="campaign",
+        subject_id="cmp_1",
+        summary="Created.",
+    )
+    collection = client.collection("tact_test_audit_entries")
+
+    try:
+        collection.document(entry.id).create(entry.model_dump(mode="json"))
+    except RuntimeError as error:
+        assert "document already exists" in str(error)
+    else:
+        raise AssertionError("existing audit entry should not be overwritten")
