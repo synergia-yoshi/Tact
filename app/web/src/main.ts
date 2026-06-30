@@ -48,6 +48,82 @@ let lastFocusedBeforeModal: HTMLElement | null = null;
 const viewSignatures = new Map<string, string>();
 const dashboardFilterStorageKey = "tact-dashboard-filters";
 
+const productPlaceholderExamples = [
+  "法人向け勤怠管理ツール",
+  "製造業向けIoTセンサー",
+  "人材紹介サービス",
+  "地域密着の歯科クリニック",
+  "オンライン英会話サービス",
+  "D2C冷凍弁当ブランド",
+  "注文住宅の工務店",
+  "相続に強い会計事務所",
+  "中古車販売店",
+  "法人向けセキュリティ診断",
+  "不動産投資スクール",
+  "24時間フィットネスジム",
+  "ECモールの季節商品",
+  "クラフトビール専門店",
+  "マーケター向けウェビナー",
+  "業務効率化SaaS",
+  "地方ホテルの宿泊プラン",
+  "資格取得スクール",
+  "医療機器メーカー",
+  "家計簿アプリ",
+];
+
+interface CampaignObjectiveOption {
+  id: string;
+  label: string;
+  kpiLabel: string;
+  kpis: string[];
+  channels: string[];
+}
+
+const campaignObjectiveOptions: CampaignObjectiveOption[] = [
+  {
+    id: "conversion",
+    label: "売上・購入",
+    kpiLabel: "ROAS・購入数・売上額",
+    kpis: ["conversion_value_jpy", "roas", "conversions"],
+    channels: ["search", "social", "display"],
+  },
+  {
+    id: "lead_generation",
+    label: "見込み顧客",
+    kpiLabel: "リード数・獲得単価・送信数",
+    kpis: ["qualified_leads", "cost_per_lead", "lead_form_submissions"],
+    channels: ["search", "social", "display"],
+  },
+  {
+    id: "traffic",
+    label: "サイト訪問",
+    kpiLabel: "クリック数・CTR・CPC",
+    kpis: ["clicks", "ctr", "cpc_jpy"],
+    channels: ["search", "display", "social"],
+  },
+  {
+    id: "awareness",
+    label: "認知拡大",
+    kpiLabel: "表示回数・リーチ・CPM",
+    kpis: ["impressions", "reach", "cpm_jpy"],
+    channels: ["display", "social", "search"],
+  },
+  {
+    id: "local_visits",
+    label: "来店・予約",
+    kpiLabel: "来店数・予約数・来店単価",
+    kpis: ["store_visits", "reservations", "cost_per_visit"],
+    channels: ["search", "display", "social"],
+  },
+  {
+    id: "app_promotion",
+    label: "アプリ獲得",
+    kpiLabel: "インストール・獲得単価・利用",
+    kpis: ["installs", "cost_per_install", "in_app_actions"],
+    channels: ["social", "display", "search"],
+  },
+];
+
 type DataIntegrationStatus = "unconnected" | "connected" | "test" | "error" | "coming_soon";
 
 interface DataIntegration {
@@ -431,7 +507,7 @@ function renderHomeControls(state: AppState): void {
   form.hidden = !canCreate;
   renderCustomerHomeSummary(!canCreate);
   el("home-title").innerHTML = canCreate
-    ? `広告づくりを、3問から。<br /><span>出す前の確認まで、ひとつずつ進めます。</span>`
+    ? `広告づくりを、4問から。<br /><span>出す前の確認まで、ひとつずつ進めます。</span>`
     : `成果と確認待ちを、ひとつずつ確認します。`;
   if (!canCreate) return;
   const busy = isLoading("createCampaign");
@@ -508,7 +584,7 @@ function generationSteps(campaign: CampaignProposal | null): GenerationStep[] {
     {
       id: "brief",
       label: "宣伝内容の入力",
-      detail: campaign == null ? "3問に答える" : campaign.brief.name,
+      detail: campaign == null ? "4問に答える" : campaign.brief.name,
       status: statusFor({
         complete: campaign != null,
         running: loading?.operation === "createCampaign",
@@ -752,7 +828,7 @@ function renderCampaigns(): void {
   const campaigns = getState().campaigns;
   const content = el("campaigns-content");
   if (campaigns.length === 0) {
-    content.innerHTML = emptyState("まだ広告案がありません", "ホームから3問に答えると、作成された広告案だけがここに表示されます。");
+    content.innerHTML = emptyState("まだ広告案がありません", "ホームから4問に答えると、作成された広告案だけがここに表示されます。");
     return;
   }
   content.innerHTML = `<div class="card-grid">${campaigns.map(campaignCard).join("")}</div>`;
@@ -785,7 +861,7 @@ function renderCreative(): void {
   const campaign = activeOrLatest();
   const content = el("creative-content");
   if (campaign == null) {
-    content.innerHTML = emptyState("広告案はまだありません", "ホームから3問に答えると、広告文と配信先の案を作成します。");
+    content.innerHTML = emptyState("広告案はまだありません", "ホームから4問に答えると、広告文と配信先の案を作成します。");
     return;
   }
   const gateBusy = isLoading("runPublishGate", campaign.id);
@@ -802,6 +878,11 @@ function renderCreative(): void {
   );
   const creativeSource = outputSourceLabel(campaign.creative.source);
   const mediaSource = outputSourceLabel(campaign.media_plan.source);
+  const objective = objectiveOption(campaign.brief.objective);
+  const totalPlacementBudget = campaign.media_plan.placements.reduce(
+    (total, placement) => total + placement.budget_jpy,
+    0,
+  );
   content.innerHTML = `
     ${generationStepper(campaign)}
     ${agentProgressPanel(campaign)}
@@ -820,7 +901,13 @@ function renderCreative(): void {
     </div>
     <div class="out in">
       <h3>配信先と予算 <span class="data-label forecast">${escapeHtml(mediaSource)}</span></h3>
-      ${campaign.media_plan.placements.map(placementRow).join("")}
+      <div class="objective-summary">
+        <span class="data-label forecast">${escapeHtml(objective.label)}</span>
+        <span>${escapeHtml(objective.kpiLabel)} を見て、媒体配分を組みます。</span>
+      </div>
+      ${campaign.media_plan.placements
+        .map((placement) => placementRow(placement, totalPlacementBudget))
+        .join("")}
     </div>
     <div class="out in">
       <h3>成果の目安 <span class="data-label forecast">予測 / テスト用</span></h3>
@@ -843,12 +930,17 @@ function renderCreative(): void {
   `;
 }
 
-function placementRow(placement: { channel: string; budget_jpy: number }): string {
+function placementRow(
+  placement: { channel: string; budget_jpy: number },
+  totalBudget: number,
+): string {
+  const share = totalBudget > 0 ? Math.round((placement.budget_jpy / totalBudget) * 100) : 0;
+  const fillWidth = Math.max(3, Math.min(100, share));
   return `
     <div class="alloc-row">
       <span class="nm">${escapeHtml(channelLabel(placement.channel))}</span>
-      <span class="track"><span class="fill" style="width:100%"></span></span>
-      <span class="pct">${formatYen(placement.budget_jpy)}</span>
+      <span class="track"><span class="fill" style="width:${safeAttr(String(fillWidth))}%"></span></span>
+      <span class="pct">${formatYen(placement.budget_jpy)} / ${escapeHtml(String(share))}%</span>
     </div>
   `;
 }
@@ -1634,10 +1726,39 @@ function allDataIntegrations(): DataIntegration[] {
   return dataIntegrationGroups.flatMap((group) => group.integrations);
 }
 
+function startProductPlaceholderLoop(): void {
+  const input = document.getElementById("product-input") as HTMLInputElement | null;
+  if (input == null) return;
+  let index = 0;
+  const rotate = () => {
+    if (input.value.trim() !== "") return;
+    input.placeholder = `例：${productPlaceholderExamples[index]}`;
+    index = (index + 1) % productPlaceholderExamples.length;
+  };
+  rotate();
+  window.setInterval(rotate, 2200);
+}
+
+function objectiveOption(id: string): CampaignObjectiveOption {
+  const normalized = id === "efficiency" ? "conversion" : id;
+  return (
+    campaignObjectiveOptions.find((option) => option.id === normalized) ??
+    campaignObjectiveOptions[0]
+  );
+}
+
+function selectedObjectiveOption(): CampaignObjectiveOption {
+  const selected =
+    document.querySelector<HTMLButtonElement>(".objective-card.selected")?.dataset
+      .objective ?? "conversion";
+  return objectiveOption(selected);
+}
+
 async function bootstrap(): Promise<void> {
   applyDemoModeChrome();
   setState({ dashboardFilters: loadStoredDashboardFilters() });
   renderNav();
+  startProductPlaceholderLoop();
   bindEvents();
   subscribe(render);
   await switchRole("operator");
@@ -1653,14 +1774,8 @@ function bindEvents(): void {
     const roleButton = target.closest<HTMLButtonElement>("[data-role]");
     if (roleButton?.dataset.role != null) void switchRole(roleButton.dataset.role as Role);
 
-    const chip = target.closest<HTMLButtonElement>(".chip");
-    if (chip?.dataset.product != null) {
-      selectWithin(chip, ".chip");
-      (el<HTMLInputElement>("product-input")).value = chip.dataset.product;
-    }
-
-    const goal = target.closest<HTMLButtonElement>(".goal-pill");
-    if (goal != null) selectWithin(goal, ".goal-pill");
+    const objective = target.closest<HTMLButtonElement>(".objective-card");
+    if (objective != null) selectWithin(objective, ".objective-card");
 
     const autonomy = target.closest<HTMLButtonElement>(".choice-card");
     if (autonomy != null) selectWithin(autonomy, ".choice-card");
@@ -1737,7 +1852,7 @@ function bindEvents(): void {
 }
 
 function selectWithin(button: HTMLButtonElement, selector: string): void {
-  const group = button.closest(".chips, .goal-pills, .choice-cards");
+  const group = button.closest(".objective-grid, .choice-cards");
   group?.querySelectorAll(selector).forEach((item) => item.classList.remove("selected"));
   button.classList.add("selected");
 }
@@ -1749,7 +1864,7 @@ function retryCampaignBrief(campaignId: string): void {
   const budgetUnits = Math.max(10, Math.min(500, Math.round(campaign.brief.total_budget_jpy / 10000)));
   el<HTMLInputElement>("budget-range").value = String(budgetUnits);
   el("budget-value").textContent = formatYen(budgetUnits * 10000);
-  selectByDataset(".goal-pill", "objective", campaign.brief.objective);
+  selectByDataset(".objective-card", "objective", campaign.brief.objective);
   selectByDataset(".choice-card", "autonomy", campaign.brief.autonomy_level, "approval_only");
   setRoute("home");
   el<HTMLInputElement>("product-input").focus();
@@ -1757,7 +1872,12 @@ function retryCampaignBrief(campaignId: string): void {
 
 function selectByDataset(selector: string, key: string, value: string, fallbackValue?: string): void {
   const candidates = Array.from(document.querySelectorAll<HTMLButtonElement>(selector));
-  const targetValue = selector === ".choice-card" && value === "full_auto" ? "approval_only" : value;
+  const targetValue =
+    selector === ".choice-card" && value === "full_auto"
+      ? "approval_only"
+      : selector === ".objective-card" && value === "efficiency"
+        ? "conversion"
+        : value;
   let matched = false;
   candidates.forEach((button) => {
     const selected = button.dataset[key] === targetValue;
@@ -2036,19 +2156,17 @@ function nextActiveCampaignId(campaigns: CampaignProposal[]): string | null {
 function formToBrief(): CampaignBrief {
   const product = el<HTMLInputElement>("product-input").value.trim();
   const budget = Number(el<HTMLInputElement>("budget-range").value) * 10000;
-  const objective =
-    document.querySelector<HTMLButtonElement>(".goal-pill.selected")?.dataset.objective ??
-    "conversion";
+  const objective = selectedObjectiveOption();
   const autonomy =
     (document.querySelector<HTMLButtonElement>(".choice-card.selected")?.dataset
       .autonomy as AutonomyLevel | undefined) ?? "approval_only";
   return {
     name: product,
-    objective,
+    objective: objective.id,
     target_audience: "Tact UI generated audience",
     total_budget_jpy: budget,
-    channels: ["search", "social", "display"],
-    kpis: objective === "efficiency" ? ["cpa_jpy"] : ["roas", "conversions"],
+    channels: objective.channels,
+    kpis: objective.kpis,
     tone: "clear and practical",
     autonomy_level: autonomy,
   };

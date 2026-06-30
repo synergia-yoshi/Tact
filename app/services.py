@@ -119,6 +119,7 @@ class CampaignService:
                         role="system",
                         content=(
                             "You create concise campaign creative drafts. "
+                            "Use the objective and KPIs to choose the angle and call to action. "
                             "Return JSON with headline, body, and call_to_action."
                         ),
                     ),

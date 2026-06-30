@@ -335,8 +335,7 @@ p {
 
 .topbar-actions,
 .section-head,
-.action-row,
-.goal-pills {
+.action-row {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -770,7 +769,7 @@ label {
   box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.14);
 }
 
-.chips,
+.objective-grid,
 .choice-cards,
 .card-grid,
 .creative-grid,
@@ -779,13 +778,12 @@ label {
   gap: 12px;
 }
 
-.chips {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.objective-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 12px;
 }
 
-.chip,
-.goal-pill,
+.objective-card,
 .choice-card {
   border: 1px solid var(--bd2);
   border-radius: 10px;
@@ -794,14 +792,38 @@ label {
   font-weight: 800;
 }
 
-.chip,
-.goal-pill {
-  padding: 9px 12px;
+.field-hint {
+  margin: 8px 0 0;
+  color: var(--tx2);
   font-size: 12px;
+  font-weight: 700;
 }
 
-.chip.selected,
-.goal-pill.selected,
+.objective-card {
+  display: flex;
+  min-height: 82px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  padding: 13px 14px;
+  text-align: left;
+}
+
+.objective-card span {
+  color: var(--tx);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.objective-card small {
+  color: var(--tx2);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.objective-card.selected,
 .choice-card.selected {
   color: var(--bl2);
   background: var(--bl-pale);
@@ -1072,6 +1094,17 @@ input[type="range"] {
   margin: 0 0 14px;
   font-size: 15px;
   font-weight: 900;
+}
+
+.objective-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: -2px 0 6px;
+  color: var(--tx2);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .alloc-row {
@@ -1793,6 +1826,10 @@ code {
   .generation-stepper {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .objective-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -1871,7 +1908,7 @@ code {
     padding: 18px;
   }
 
-  .chips,
+  .objective-grid,
   .generation-stepper,
   .kpi-row,
   .channel-metrics {
@@ -1892,5 +1929,20 @@ code {
 
   .setting-head {
     display: flex;
+  }
+
+  .alloc-row {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .alloc-row .nm {
+    width: auto;
+  }
+
+  .alloc-row .pct {
+    grid-column: 2;
+    min-width: 0;
+    text-align: left;
   }
 }
