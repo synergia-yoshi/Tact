@@ -56,10 +56,11 @@ Hermes defaults to Opus 4.8:
 ```text
 ANTHROPIC_MODEL=claude-opus-4-8
 HERMES_DAILY_API_BUDGET_USD=1.50
-MAX_CANDIDATES_PER_RUN=80
+MAX_CANDIDATES_PER_RUN=40
 MAX_DELIVERIES_PER_RUN=5
 TTP_SCORE_THRESHOLD=18
-LLM_BATCH_SIZE=5
+LLM_BATCH_SIZE=8
+MAX_BODY_CHARS_PER_CANDIDATE=3000
 ```
 
 The app estimates cost before each LLM batch and records actual usage from Anthropic responses. If the daily budget would be exceeded, Hermes stops and sends a Slack alert.
