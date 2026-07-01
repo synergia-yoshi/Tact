@@ -1,0 +1,54 @@
+name: Hermes Daily Digest
+
+on:
+  # JST 7:00 is UTC 22:00 on the previous day.
+  # Avoid minute 0 because GitHub Actions scheduled workflows can be delayed at the top of the hour.
+  # Known trap: public repositories with no push for 60 days can have scheduled workflows disabled.
+  # Keep the repository active with periodic config/doc updates or watch for the daily "no matches" Slack ping.
+  schedule:
+    - cron: "7 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  hermes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      PRODUCT_HUNT_TOKEN: ${{ secrets.PRODUCT_HUNT_TOKEN }}
+      ANTHROPIC_MODEL: claude-opus-4-8
+      HERMES_DAILY_API_BUDGET_USD: "1.50"
+      MAX_CANDIDATES_PER_RUN: "80"
+      MAX_DELIVERIES_PER_RUN: "5"
+      TTP_SCORE_THRESHOLD: "18"
+      LLM_BATCH_SIZE: "20"
+      ENABLE_PRODUCT_HUNT_GRAPHQL: "true"
+      ENABLE_GITHUB_TRENDING: "false"
+      ENABLE_REDDIT: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npm start
+
+      - name: Commit Hermes seen state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/seen.json
+          git diff --cached --quiet || git commit -m "chore: update Hermes seen state"
+          git push
