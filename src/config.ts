@@ -73,7 +73,7 @@ export function loadConfig(): HermesConfig {
     maxCandidatesPerRun: envNumber("MAX_CANDIDATES_PER_RUN", 80),
     maxDeliveriesPerRun: envNumber("MAX_DELIVERIES_PER_RUN", 5),
     ttpScoreThreshold: envNumber("TTP_SCORE_THRESHOLD", 18),
-    llmBatchSize: envNumber("LLM_BATCH_SIZE", 20),
+    llmBatchSize: envNumber("LLM_BATCH_SIZE", 5),
     dryRun: envBool("DRY_RUN", false),
     enableProductHuntGraphql: envBool("ENABLE_PRODUCT_HUNT_GRAPHQL", Boolean(process.env.PRODUCT_HUNT_TOKEN)),
     enableGithubTrending: envBool("ENABLE_GITHUB_TRENDING", false),
