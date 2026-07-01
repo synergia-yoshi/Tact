@@ -36,6 +36,7 @@ Axis meaning:
 Return strict JSON only. No Markdown. No commentary outside JSON.
 
 Return every candidate, including rejected candidates.
+Keep each reason concise. Valid JSON is more important than long prose.
 
 For candidates with total score >= the threshold supplied in the user message:
 - `should_deliver` must be true.

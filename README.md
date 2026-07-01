@@ -59,6 +59,7 @@ HERMES_DAILY_API_BUDGET_USD=1.50
 MAX_CANDIDATES_PER_RUN=80
 MAX_DELIVERIES_PER_RUN=5
 TTP_SCORE_THRESHOLD=18
+LLM_BATCH_SIZE=5
 ```
 
 The app estimates cost before each LLM batch and records actual usage from Anthropic responses. If the daily budget would be exceeded, Hermes stops and sends a Slack alert.

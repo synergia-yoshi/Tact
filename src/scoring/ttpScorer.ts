@@ -104,6 +104,72 @@ function currentDailyCost(state: SeenState): number {
   return state.dailyCosts[jstDateKey()] ?? 0;
 }
 
+async function scoreBatchWithRetry(
+  batch: CandidateItem[],
+  system: string,
+  state: SeenState,
+  config: HermesConfig,
+  spent: { value: number }
+): Promise<{ items: ScoredItem[]; stoppedForBudget: boolean }> {
+  const user = buildUserPrompt(batch, config);
+  const promptForEstimate = `${system}\n${user}`;
+  const estimatedOutputTokens = Math.min(
+    config.anthropicMaxTokens,
+    batch.length * 450 + config.maxDeliveriesPerRun * 900
+  );
+  const estimatedCost = estimateAnthropicCallCost(config, promptForEstimate, estimatedOutputTokens);
+  const alreadySpent = currentDailyCost(state) + spent.value;
+
+  if (alreadySpent + estimatedCost > config.dailyApiBudgetUsd) {
+    console.warn(
+      `[budget] stopping before LLM batch: spent=${alreadySpent.toFixed(4)} estimated=${estimatedCost.toFixed(4)} budget=${config.dailyApiBudgetUsd.toFixed(2)}`
+    );
+    return { items: [], stoppedForBudget: true };
+  }
+
+  console.log(
+    `[llm] scoring batch size=${batch.length} estimatedInputTokens=${estimateTokens(promptForEstimate)}`
+  );
+  const response = await callAnthropic(config, system, user);
+  spent.value += response.costUsd;
+  console.log(
+    `[llm] usage input=${response.inputTokens} output=${response.outputTokens} cost=$${response.costUsd.toFixed(4)}`
+  );
+
+  try {
+    const parsed = extractJson(response.text);
+    const byId = new Map(parsed.items.map((item) => [item.id, item]));
+    return {
+      items: batch.map((candidate) => normalizeScoredItem(candidate, byId.get(candidate.id))),
+      stoppedForBudget: false
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[llm] JSON parse failed for batch size=${batch.length}: ${message}`);
+    if (batch.length === 1) {
+      return {
+        items: [
+          {
+            ...normalizeScoredItem(batch[0]),
+            riskNoteJapanese:
+              "LLM出力JSONの解析に失敗したため、この候補は安全側で配信対象外にしました。"
+          }
+        ],
+        stoppedForBudget: false
+      };
+    }
+
+    const midpoint = Math.ceil(batch.length / 2);
+    const first = await scoreBatchWithRetry(batch.slice(0, midpoint), system, state, config, spent);
+    if (first.stoppedForBudget) return first;
+    const second = await scoreBatchWithRetry(batch.slice(midpoint), system, state, config, spent);
+    return {
+      items: [...first.items, ...second.items],
+      stoppedForBudget: second.stoppedForBudget
+    };
+  }
+}
+
 export async function scoreCandidates(
   candidates: CandidateItem[],
   state: SeenState,
@@ -111,42 +177,19 @@ export async function scoreCandidates(
 ): Promise<ScoringResult> {
   const system = fs.readFileSync(config.promptPath, "utf8");
   const scored: ScoredItem[] = [];
-  let spent = 0;
+  const spent = { value: 0 };
   let stoppedForBudget = false;
 
   for (const batch of chunk(candidates, config.llmBatchSize)) {
-    const user = buildUserPrompt(batch, config);
-    const promptForEstimate = `${system}\n${user}`;
-    const estimatedOutputTokens = Math.min(
-      config.anthropicMaxTokens,
-      batch.length * 450 + config.maxDeliveriesPerRun * 900
-    );
-    const estimatedCost = estimateAnthropicCallCost(config, promptForEstimate, estimatedOutputTokens);
-    const alreadySpent = currentDailyCost(state) + spent;
-
-    if (alreadySpent + estimatedCost > config.dailyApiBudgetUsd) {
-      console.warn(
-        `[budget] stopping before LLM batch: spent=${alreadySpent.toFixed(4)} estimated=${estimatedCost.toFixed(4)} budget=${config.dailyApiBudgetUsd.toFixed(2)}`
-      );
+    const result = await scoreBatchWithRetry(batch, system, state, config, spent);
+    scored.push(...result.items);
+    if (result.stoppedForBudget) {
       stoppedForBudget = true;
       break;
     }
-
-    console.log(
-      `[llm] scoring batch size=${batch.length} estimatedInputTokens=${estimateTokens(promptForEstimate)}`
-    );
-    const response = await callAnthropic(config, system, user);
-    spent += response.costUsd;
-    console.log(
-      `[llm] usage input=${response.inputTokens} output=${response.outputTokens} cost=$${response.costUsd.toFixed(4)}`
-    );
-
-    const parsed = extractJson(response.text);
-    const byId = new Map(parsed.items.map((item) => [item.id, item]));
-    scored.push(...batch.map((candidate) => normalizeScoredItem(candidate, byId.get(candidate.id))));
   }
 
-  return { items: scored, costUsd: spent, stoppedForBudget };
+  return { items: scored, costUsd: spent.value, stoppedForBudget };
 }
 
 export function mockScoreCandidates(
