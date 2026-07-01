@@ -1,5 +1,10 @@
 {
-  "seenIds": [],
-  "dailyCosts": {},
-  "updatedAt": null
+  "seenIds": [
+    "hn-launch-hn:47457472",
+    "hn-show-hn:48671886"
+  ],
+  "dailyCosts": {
+    "2026-07-01": 0.72049
+  },
+  "updatedAt": "2026-07-01T13:58:15.682Z"
 }
