@@ -53,7 +53,7 @@ function itemBlocks(item: ScoredItem, index: number, config: HermesConfig): Slac
           type: "mrkdwn",
           text:
             `TTP *${item.ttpTotalScore.toFixed(1)}/25* | ${scoreLine(item)} | ` +
-            `<${item.url}|${item.sourceName}>`
+            `出典: <${item.url}|${item.sourceName}>`
         }
       ]
     },

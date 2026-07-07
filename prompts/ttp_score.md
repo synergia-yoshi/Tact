@@ -13,14 +13,14 @@ Your job is not to translate generic news. Your job is to identify which oversea
 Score each axis from 0 to 5. Use decimals only when helpful.
 
 Initial weights:
-- imitability: 0.32
+- imitability: 0.37
 - timing: 0.24
 - japan_transferability: 0.20
 - breakthrough: 0.14
-- adjacency: 0.10
+- adjacency: 0.05
 
 Weighted total:
-`total = 5 * (imitability*0.32 + timing*0.24 + japan_transferability*0.20 + breakthrough*0.14 + adjacency*0.10)`
+`total = 5 * (imitability*0.37 + timing*0.24 + japan_transferability*0.20 + breakthrough*0.14 + adjacency*0.05)`
 
 This yields a 0-25 total score.
 
@@ -29,7 +29,7 @@ Axis meaning:
 - timing: Is now a good moment? Avoid things that are too early, too late, or only boosted by short-lived hype.
 - japan_transferability: Can it be transplanted to Japan with realistic localization?
 - breakthrough: Is it meaningfully non-obvious or discontinuous, rather than another thin wrapper?
-- adjacency: Is it adjacent to ECHO or Tact? This matters, but less than the first four axes.
+- adjacency: Is it adjacent to ECHO or Tact? Treat this as a light contextual bonus, not a primary reason to deliver.
 
 ## Output Rules
 
