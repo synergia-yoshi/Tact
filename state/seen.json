@@ -4,6 +4,7 @@
     "first-round-review-rss:699cd1b28a0b8f0001e5c1f0",
     "first-round-review-rss:69b0231a8a0b8f0001eb7d46",
     "first-round-review-rss:6a04c99ecf66e40001cef07e",
+    "hn-launch-hn:47417335",
     "hn-launch-hn:47457472",
     "hn-launch-hn:48109962",
     "hn-launch-hn:48225040",
@@ -11,7 +12,10 @@
     "hn-launch-hn:48463273",
     "hn-launch-hn:48543908",
     "hn-launch-hn:48586299",
+    "hn-launch-hn:48762862",
+    "hn-launch-hn:48847562",
     "hn-show-hn:48671886",
+    "hn-show-hn:48847834",
     "product-hunt-graphql:1190152"
   ],
   "dailyCosts": {
@@ -23,7 +27,8 @@
     "2026-07-06": 0.621835,
     "2026-07-07": 0.69203,
     "2026-07-08": 0.855935,
-    "2026-07-09": 0.698885
+    "2026-07-09": 0.698885,
+    "2026-07-10": 0.773075
   },
-  "updatedAt": "2026-07-08T23:27:08.829Z"
+  "updatedAt": "2026-07-09T23:29:37.915Z"
 }
