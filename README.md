@@ -27,20 +27,25 @@ Public repository secret leaks can lead to immediate unauthorized API usage and 
 
 For local testing, use `.env` only. `.env` is ignored by git. Commit `.env.example`, not `.env`.
 
-## Schedule
+## GitHub Actions Status
 
 The workflow lives at `.github/workflows/hermes.yml`.
 
-- Desired delivery: JST 7:00
-- GitHub Actions cron timezone: UTC
-- Cron used: `7 22 * * *`, which is 22:07 UTC on the previous day
-- Minute `0` is intentionally avoided to reduce top-of-hour congestion
-- `workflow_dispatch` is enabled for manual runs
+- Scheduled GitHub Actions delivery is paused.
+- The legacy workflow is retained as manual-only via `workflow_dispatch`.
+- Daily/weekly/monthly intelligence delivery has moved to Codex Automations so the legacy Anthropic API run does not spend API credits automatically.
+
+Historical schedule notes:
+
+- Desired delivery was JST 7:00
+- GitHub Actions cron timezone is UTC
+- The prior cron was `7 22 * * *`, which is 22:07 UTC on the previous day
+- Minute `0` was intentionally avoided to reduce top-of-hour congestion
 
 Important GitHub Actions trap: scheduled workflows in public repositories can be automatically disabled if the repository has no push activity for 60 days. Mitigations:
 
 - Make a small config/docs update periodically.
-- Keep the daily "no matches" Slack notification enabled as a heartbeat.
+- Keep a separate daily Slack notification enabled as a heartbeat if scheduled GitHub Actions delivery is re-enabled.
 - If the heartbeat disappears, check whether GitHub disabled the scheduled workflow.
 
 ## State Persistence

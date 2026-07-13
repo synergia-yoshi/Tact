@@ -1,12 +1,9 @@
-name: Hermes Daily Digest
+name: Hermes Digest (manual only)
 
 on:
-  # JST 7:00 is UTC 22:00 on the previous day.
-  # Avoid minute 0 because GitHub Actions scheduled workflows can be delayed at the top of the hour.
-  # Known trap: public repositories with no push for 60 days can have scheduled workflows disabled.
-  # Keep the repository active with periodic config/doc updates or watch for the daily "no matches" Slack ping.
-  schedule:
-    - cron: "7 22 * * *"
+  # Scheduled Hermes delivery is paused.
+  # Daily/weekly/monthly intelligence delivery is handled by Codex Automations instead,
+  # so this workflow is retained only for explicit manual runs while the legacy bot exists.
   workflow_dispatch:
 
 permissions:
